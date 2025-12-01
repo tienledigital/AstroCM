@@ -3,7 +3,7 @@
 
 A simple, clean web interface to upload Markdown/MDX posts and images directly to your Astro project's GitHub repository. Streamline your content workflow without leaving the browser.
 
-![Astro Content Manager Preview](.github/assets/app-preview.png)
+![Astro Content Manager Preview](.github/app-preview.png)
 
 **Quick Links:** [Project Overview](./OVERVIEW.md) • [User Guide](./GUIDE.md) • [Changelog](./CHANGELOG.md) • [Licenses](./LICENSES.md)
 

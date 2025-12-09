@@ -1,24 +1,28 @@
 
 /**
  * Processes an image file: resizes if it exceeds a maximum width and/or compresses
- * if it exceeds a maximum file size.
+ * if it exceeds a maximum file size (in KB).
+ * Preserves the original file format (extension/MIME type).
  *
  * @param file The original image file.
- * @param maxSizeMB The maximum desired file size in megabytes.
+ * @param maxSizeKB The maximum desired file size in Kilobytes.
  * @param maxWidth The maximum desired width in pixels. A value of 0 means no resizing.
- * @param quality The quality level for JPEG compression (0.0 to 1.0).
+ * @param quality The quality level for compression (0.0 to 1.0).
  * @returns A promise that resolves to the processed file, or the original file if no processing was needed.
  */
-// FIX: Removed `async` keyword to avoid returning a nested promise (`Promise<Promise<File>>`).
-// This ensures the function consistently returns `Promise<File>`, fixing the type error.
 export const compressImage = (
   file: File,
-  maxSizeMB: number,
+  maxSizeKB: number,
   maxWidth: number,
   quality = 0.85
 ): Promise<File> => {
+  // 1. Skip if not an image
   if (!file.type.startsWith('image/')) {
-    // FIX: Explicitly return a resolved promise to match the function's return type.
+    return Promise.resolve(file);
+  }
+
+  // 2. Skip GIFs to preserve animation (Canvas destroys GIF frames)
+  if (file.type === 'image/gif') {
     return Promise.resolve(file);
   }
 
@@ -29,8 +33,9 @@ export const compressImage = (
     img.onload = () => {
       URL.revokeObjectURL(img.src);
 
+      // Check criteria
       const needsResize = maxWidth > 0 && img.width > maxWidth;
-      const needsCompress = file.size > maxSizeMB * 1024 * 1024;
+      const needsCompress = file.size > maxSizeKB * 1024;
 
       if (!needsResize && !needsCompress) {
         return resolve(file);
@@ -46,6 +51,7 @@ export const compressImage = (
       let targetWidth = img.width;
       let targetHeight = img.height;
 
+      // Calculate new dimensions
       if (needsResize) {
         targetWidth = maxWidth;
         targetHeight = img.height * (maxWidth / img.width);
@@ -53,7 +59,13 @@ export const compressImage = (
 
       canvas.width = targetWidth;
       canvas.height = targetHeight;
+      
+      // Draw image
       ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+
+      // Determine output format (keep original)
+      // Note: 'image/jpg' isn't standard, browser uses 'image/jpeg'
+      const outputType = file.type === 'image/jpg' ? 'image/jpeg' : file.type;
 
       canvas.toBlob(
         (blob) => {
@@ -61,20 +73,22 @@ export const compressImage = (
             return reject(new Error('Canvas to Blob conversion failed.'));
           }
           
-          const newFileName = file.name.substring(0, file.name.lastIndexOf('.')) + '.jpg';
-          const processedFile = new File([blob], newFileName, {
-            type: 'image/jpeg',
+          // If the "compressed" blob is actually larger than the original, revert to original
+          // This happens often with PNGs if the content is complex and we aren't resizing
+          if (blob.size > file.size && !needsResize) {
+             resolve(file);
+             return;
+          }
+
+          // Create new file with same name and extension
+          const processedFile = new File([blob], file.name, {
+            type: outputType,
             lastModified: Date.now(),
           });
           
-          // If no compression was intended and resizing made it bigger, return original
-          if (!needsCompress && processedFile.size > file.size) {
-             resolve(file);
-          } else {
-             resolve(processedFile);
-          }
+          resolve(processedFile);
         },
-        'image/jpeg',
+        outputType,
         quality
       );
     };
@@ -84,4 +98,30 @@ export const compressImage = (
         reject(error);
     };
   });
+};
+
+/**
+ * Checks if a filename matches the allowed image types.
+ * @param filename The filename to check.
+ * @param acceptedTypes Comma-separated list of extensions (e.g. ".jpg, .png") or MIME types.
+ */
+export const isImageFile = (filename: string, acceptedTypes: string): boolean => {
+    const lowerFilename = filename.toLowerCase();
+    const commonImageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp', '.ico', '.tiff'];
+
+    if (!acceptedTypes || acceptedTypes.trim() === '' || acceptedTypes.trim() === 'image/*') {
+        return commonImageExtensions.some(ext => lowerFilename.endsWith(ext));
+    }
+
+    // Filter for explicit extensions provided in settings
+    const allowedExtensions = acceptedTypes.split(',')
+        .map(t => t.trim().toLowerCase())
+        .filter(t => t.startsWith('.'));
+
+    if (allowedExtensions.length === 0) {
+        // Fallback if user provides MIME types (e.g. image/png) instead of extensions
+        return commonImageExtensions.some(ext => lowerFilename.endsWith(ext));
+    }
+    
+    return allowedExtensions.some(ext => lowerFilename.endsWith(ext));
 };

@@ -1,56 +1,83 @@
-# Astro Content Manager
-> Current Version: 1.3.3
 
-A simple, clean web interface to upload Markdown/MDX posts and images directly to your Astro project's GitHub repository. Streamline your content workflow without leaving the browser.
+# Astro CM
+> **Version:** 1.4.0 (Stable)
 
-![Astro Content Manager Preview](.github/app-preview.png)
+A simple, clean web interface to upload Markdown/MDX posts and images directly to your project's repository on **GitHub**. Streamline your content workflow without leaving the browser.
 
-**Quick Links:** [Project Overview](./OVERVIEW.md) • [User Guide](./GUIDE.md) • [Changelog](./CHANGELOG.md) • [Licenses](./LICENSES.md)
+<p align="center">
+  <img src="https://raw.githubusercontent.com/tienledigital/AstroCM/main/.github/assets/screenshot-1.png" width="100%" alt="Astro Content Manager Preview">
+</p>
+
+**Quick Links:** [Project Overview](./OVERVIEW.md) • [Changelog](./CHANGELOG.md) • [Licenses](./LICENSES.md)
 
 ---
 
 ## ✨ Key Features
 
-- **Direct GitHub Integration:** Connects securely to your GitHub account using an encrypted, session-stored Personal Access Token.
-- **Smart Initial Setup:** Automatically scans your repository to suggest content directories, getting you started faster.
-- **Comprehensive Post Management:** A powerful dashboard to list, search, preview, and update existing posts.
-- **Streamlined Post Creation:** A guided, step-by-step workflow for publishing new posts, complete with image uploads.
-- **Image Management:** Browse, search, copy production-ready URLs, and delete images from your assets directory to keep your repository clean.
-- **Frontmatter Validation:** Define a custom template from an existing post to enforce consistent structure for all new content.
-- **Multi-language Support:** Fully localized interface supporting English (en) and Vietnamese (vi).
-- **Content Backup:** Easily download `.zip` archives of your posts and images directories.
-- **Highly Configurable:** Customize content paths, commit message templates, image compression, and more in the settings panel.
+- **Comprehensive UI Redesign:** A completely new **Notion-style** interface. Minimalist, content-focused, and designed for distraction-free writing.
+- **Interactive Setup Wizard:** Automatically scans your repository to suggest content directories using a visual file tree explorer.
+- **Smart Architecture:**
+  - **Optimistic Locking:** Prevents overwriting files if they have changed on the server since you opened them.
+  - **Client-Side Caching:** Uses the Git Tree API for fast navigation in large repositories.
+- **Comprehensive Dashboard:**
+  - **Manage Posts:** Search, sort, filter, and edit existing Markdown/MDX content.
+  - **Manage Images:** Dedicated gallery view with upload, preview, and delete functionality.
+  - **Workflows:** Step-by-step wizard for creating new posts with validation.
+- **Advanced Configuration:**
+  - **Project Types:** Toggle between "Web Project" (Astro/Next.js) for live image previews or "File Library" for raw file management.
+  - **Template Validation:** Enforce frontmatter structure using custom templates.
+  - **Image Optimization:** Automatic client-side compression and resizing before upload.
+- **Data Safety:**
+  - **Local Encryption:** Your Personal Access Token (PAT) is encrypted using Web Crypto API and stored only in `sessionStorage`.
+  - **Backups:** One-click download of your posts or images as `.zip` archives.
+- **Internationalization:** Fully localized in English and Vietnamese.
 
 ---
 
 ## 🚀 Getting Started
 
-To use the Astro Content Manager, you just need to open the `index.html` file in your browser. For a more detailed guide on setup, functionality, and the technical stack, please see the [**Project Overview**](./OVERVIEW.md).
+For a detailed guide on setup, functionality, and the technical stack, please see the [**Project Overview**](./OVERVIEW.md).
 
-1.  **Generate a GitHub Fine-Grained PAT:** Create a [Fine-Grained Personal Access Token](https://github.com/settings/tokens/new?type=beta). Grant it access to the specific repository you want to manage with **"Contents"** permissions set to **"Read and write"**.
-2.  **Connect:** Open the app, paste your repository URL and your token to connect.
-3.  **Setup:** Select your posts directory from the suggested paths or pick one manually.
-4.  **Manage:** Use the dashboard to manage your existing content or create new posts!
+1.  **Generate an Access Token:**
+    - Create a [Fine-Grained Personal Access Token](https://github.com/settings/tokens/new?type=beta) on GitHub.
+    - Grant it access to the specific repository you want to manage.
+    - Set **"Contents"** permissions to **"Read and write"**.
+2.  **Connect:** Open the app and enter your repository details (e.g., `username/repo`).
+3.  **Setup:** Follow the on-screen wizard to select your content and asset directories.
+4.  **Manage:** Start creating and updating content immediately!
+
+---
+
+## 📅 Roadmap
+
+- **Self-Hosted Support:** Adapters for **Gitea** and **Gogs** are currently in experimental testing and will be released in v1.5.0.
+- **GitLab Support:** Planned integration for GitLab repositories.
+- **AI Writing Assistant:** Integration with AI models to assist in drafting content.
+
+---
 
 ## 🖼️ Screenshots
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/tienledigital/astro-content-manager/main/.github/assets/screenshot-1.png" width="32%" alt="Dashboard View">
-  <img src="https://raw.githubusercontent.com/tienledigital/astro-content-manager/main/.github/assets/screenshot-2.png" width="32%" alt="Post Management">
-  <img src="https://raw.githubusercontent.com/tienledigital/astro-content-manager/main/.github/assets/screenshot-3.png" width="32%" alt="New Post Creator">
+  <img src="https://raw.githubusercontent.com/tienledigital/AstroCM/main/.github/assets/screenshot-2.png" width="32%" alt="Dashboard View">
+  <img src="https://raw.githubusercontent.com/tienledigital/AstroCM/main/.github/assets/screenshot-3.png" width="32%" alt="Post Management">
+  <img src="https://raw.githubusercontent.com/tienledigital/AstroCM/main/.github/assets/screenshot-4.png" width="32%" alt="New Post Creator">
 </p>
 <p align="center">
-  <img src="https://raw.githubusercontent.com/tienledigital/astro-content-manager/main/.github/assets/screenshot-4.png" width="32%" alt="Settings Page">
-  <img src="https://raw.githubusercontent.com/tienledigital/astro-content-manager/main/.github/assets/screenshot-5.png" width="32%" alt="Image Management">
-  <img src="https://raw.githubusercontent.com/tienledigital/astro-content-manager/main/.github/assets/screenshot-6.png" width="32%" alt="Template Management">
+  <img src="https://raw.githubusercontent.com/tienledigital/AstroCM/main/.github/assets/screenshot-5.png" width="32%" alt="Settings Page">
+  <img src="https://raw.githubusercontent.com/tienledigital/AstroCM/main/.github/assets/screenshot-6.png" width="32%" alt="Image Management">
+  <img src="https://raw.githubusercontent.com/tienledigital/AstroCM/main/.github/assets/screenshot-7.png" width="32%" alt="Template Management">
 </p>
+
+---
 
 ## 🛠️ Technology Stack
 
-- **Frontend:** React, TypeScript
-- **Styling:** Tailwind CSS
-- **API:** GitHub REST API
-- **Utilities:** Marked & DOMPurify (for Markdown preview), JSZip (for backups)
+- **Frontend:** React 19, TypeScript
+- **Styling:** Tailwind CSS (Custom Notion-inspired theme)
+- **API:** Native Fetch API (GitHub REST API v3)
+- **Utilities:** Marked, DOMPurify, JSZip
+- **Security:** Web Crypto API (AES-GCM)
 
 ## 🤝 Contributing
 

@@ -1,5 +1,5 @@
 {
-  "name": "Astro Content Manager v1.3.3",
-  "description": "An interface to upload Markdown/MDX posts and images directly to your Astro project's GitHub repository, simplifying your content workflow.",
+  "name": "Astro CM Notion style v1.4.0",
+  "description": "An interface to upload Markdown/MDX posts and images directly to your project's repository on GitHub, Gitea, or Gogs, simplifying your content workflow.",
   "requestFramePermissions": []
 }

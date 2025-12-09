@@ -1,133 +1,90 @@
 # Project Overview: Astro Content Manager
+> Version 1.4.0 (Stable)
 
 This document provides a detailed overview of the Astro Content Manager, including its functionality, technical stack, and setup instructions.
 
 ## 1. Introduction
 
-The Astro Content Manager is a client-side web application designed to simplify the process of adding and managing content (Markdown/MDX posts and images) in an Astro-based project hosted on GitHub. It provides a feature-rich, user-friendly dashboard that communicates directly with the GitHub API, eliminating the need for `git` commands or local development environments for most content-related tasks.
+The Astro Content Manager is a client-side web application designed to simplify the process of adding and managing content (Markdown/MDX posts and images) in a project hosted on **GitHub**. It provides a feature-rich, user-friendly dashboard that communicates directly with the GitHub API, eliminating the need for `git` commands or local development environments for most content-related tasks.
 
-The entire application runs in the browser. User credentials (GitHub PAT) are encrypted using the Web Crypto API before being stored in `sessionStorage` for the current browser session.
+The entire application runs in the browser. User credentials (Personal Access Token) are encrypted using the **Web Crypto API** before being stored in `sessionStorage` for the current browser session.
 
 ## 2. Core Functionality
 
-### GitHub Authentication
-- The application uses a GitHub **Personal Access Token (PAT)** and a repository URL for connection.
-- For maximum security, users must generate a **Fine-Grained Personal Access Token**. This allows access to be restricted to a single repository with specific permissions.
-- The required permissions are under "Repository permissions": **"Contents"** must be set to **"Read and write"**.
-- The token is **encrypted on the client-side** and stored in the browser's `sessionStorage`. It is cleared when the browser tab is closed.
+### User Interface Design
+- **Notion-Inspired Aesthetic:** The UI has been completely redesigned in v1.4.0 to mirror the clean, minimalist look of Notion.
+- **Focus:** Emphasis on typography, whitespace, and subtle interactions to reduce cognitive load.
+- **Navigation:** A collapsible sidebar allows quick switching between managing posts, images, settings, and backups.
 
-### Smart Initial Setup
-- Upon first connection to a repository, the application automatically scans for directories that contain Markdown files (e.g., `src/content/blog`, `src/posts`).
-- It also scans for common image directories (e.g., `public/images`, `src/assets`).
-- It presents these as suggestions, allowing the user to quickly select their main content and image directories. A manual directory picker is also available.
-- This setting is saved locally for the specific repository, streamlining future sessions.
+### Git Service Authentication
+- **Provider:** Currently supports **GitHub** (Cloud/Enterprise). *Support for Gitea and Gogs is currently in experimental roadmap status.*
+- **Connection:** Requires a Personal Access Token (PAT) and repository URL.
+- **Security:** Tokens are **encrypted client-side** (AES-GCM) and stored in ephemeral storage (`sessionStorage`). They are never sent to any third-party server, only directly to GitHub's API.
+
+### Interactive First-Time Setup
+- **Wizard:** Upon first connection, the app scans the repository structure.
+- **File Explorer:** Users can browse the repository tree to visually select the `posts` and `images` directories.
+- **Suggestions:** The app intelligently suggests folders based on file extensions found during the scan.
+
+### Performance & Safety
+- **Git Tree API:** Utilizes recursive tree fetching to handle repositories with thousands of files efficiently, minimizing API round-trips.
+- **Optimistic Locking:** Before saving changes, the app verifies the file's SHA hash against the server. If a conflict is detected (the file changed since it was loaded), the save is prevented to avoid data loss.
+- **Global Sync Status:** A persistent badge indicates if the app is currently syncing data or if all changes are saved.
 
 ### The Dashboard
-The main interface is a multi-tabbed dashboard providing a complete content management solution.
+The interface is divided into functional tabs, fully responsive for mobile and desktop.
 
-#### **Manage Posts Tab**
-- Displays a paginated, searchable grid of all posts from the selected content directory.
-- Each post is represented as a card showing key frontmatter details (title, author, date, tags, etc.) and a cover image.
-- **Actions:**
-  - **Preview:** Opens a modal with a full preview of the rendered Markdown, a metadata view, and the raw code.
-  - **Update File:** Allows replacing the entire `.md`/`.mdx` file with a new version from your local machine.
-  - **Update Image:** A shortcut to upload a new cover image and automatically update the post's frontmatter.
-  - **Delete:** Securely delete a post from the repository.
+#### **Manage Posts**
+- **Table/Grid Views:** Toggle between a dense data table or a visual grid with cover images.
+- **Sorting & Filtering:** Search by text; sort by date or title.
+- **Editing:** Update frontmatter properties and markdown content via a split-pane editor (Preview/Code).
 
-#### **Create Post Tab**
-- A guided, step-by-step workflow for publishing a new post.
-- **Step 1: Upload Images:** Upload one or more images required for the new post.
-- **Step 2: Upload Post:** Upload the final `.md`/`.mdx` file.
-- **Validation:** The frontmatter of the uploaded post is automatically validated against either default rules or a user-defined template to ensure consistency.
-- **Publish:** Once validated, the post and any associated images are committed to the repository with a single click.
+#### **Create Post Workflow**
+- **Step-by-Step:** A guided wizard:
+    1.  **Assets:** Batch upload and compress images.
+    2.  **Content:** Upload a Markdown file. The app validates frontmatter against your template and checks image links.
+    3.  **Publish:** Commits images and the post file in a streamlined sequence.
 
-#### **Manage Images Tab**
-- Displays a searchable list of all images from the selected assets directory.
-- Each image is shown with a preview, its filename, and file size.
-- **Actions:**
-  - **Copy URL:** Copies a production-ready URL to the clipboard, formatted according to the project's domain settings.
-  - **Delete:** Securely delete an image from the repository.
+#### **Manage Images**
+- **Gallery:** Visual grid of assets in the selected images directory.
+- **Utilities:** Copy public/relative URLs to clipboard, delete unused images, and upload new assets.
 
-#### **Template Tab**
-- Users can define a strict frontmatter validation template.
-- **Generation:** A template can be automatically generated by uploading an existing, well-structured post file. The app infers field names and data types (string, date, array, object).
-- **Management:** The active template is displayed and can be cleared to revert to default validation. Users can also download a sample Markdown file based on the template.
+#### **Configuration & Maintenance**
+- **Template Generator:** Define strict validation rules for frontmatter (required fields, data types) by analyzing an existing post.
+- **Backups:** Generate client-side `.zip` archives of your content directories using `JSZip`.
+- **Settings:** Customize commit messages, enable image compression (max width/size), and toggle UI language (English/Vietnamese).
 
-#### **Backup Tab**
-- Provides functionality to download local backups of content.
-- Users can generate and download a `.zip` archive of either the entire posts directory or the images directory.
+## 3. Architecture
 
-#### **Settings Tab**
-- A centralized location for all configuration options.
-- **Paths:** Change the posts and images directory paths.
-- **Commit Messages:** Customize the templates used for commit messages for actions like creating/updating posts and images. Placeholders like `{filename}` are supported.
-- **File Types:** Modify the accepted file extensions/MIME types for post and image uploads.
+### Adapter Pattern
+The application uses an Adapter pattern to abstract Git provider differences:
+- `IGitService`: The common interface.
+- `GithubAdapter`: Implements GitHub REST API v3.
+- *Note: The architecture supports future expansion to Gitea/Gogs adapters.*
 
-### Internationalization (i18n)
-- The entire user interface is available in both **English** and **Vietnamese**.
-- The user's language preference is saved in their browser for future sessions.
+This allows the UI components (`Dashboard`, `PostList`) to remain agnostic of the underlying service.
 
-## 3. How It Works: The Workflow
-
-1.  **Connect:** The user provides their GitHub repository URL and a Fine-Grained PAT.
-2.  **Verify & Initialize:** The app verifies the token and repository permissions. It then scans for content directories to guide the user through a one-time setup.
-3.  **Manage:** The user interacts with the dashboard.
-4.  **API Calls:** All actions (reading, creating, updating, deleting files) are translated into corresponding GitHub REST API calls. Files are Base64 encoded before being sent.
-5.  **Commit:** Each action creates a new commit in the repository with a descriptive, configurable message.
-6.  **Feedback:** The UI provides real-time feedback, loading states, and success/error messages.
+### State Management
+- **Session:** Encrypted token stored in `sessionStorage`.
+- **Config:** Repository-specific settings (paths, project type) stored in `localStorage` and optionally synced to a `.acmrc.json` file in the repository root.
+- **URL Sync:** Active views are synced to the URL query string for deep linking support.
 
 ## 4. Technical Stack
 
-- **Framework:** **React** with TypeScript
-- **Styling:** **Tailwind CSS** for rapid, utility-first styling.
-- **API Interaction:** Native `fetch` API to interact with the **GitHub REST API**.
-- **State Management:** React Hooks (`useState`, `useEffect`, `useCallback`).
-- **Utilities:**
-  - **Marked & DOMPurify:** Used for rendering secure Markdown previews.
-  - **JSZip:** Used for creating `.zip` archives for the backup feature.
-- **No Build Step:** The project uses `ESM` modules via an import map in `index.html`, allowing it to run directly in modern browsers without a complex build process.
+- **Framework:** **React 19**
+- **Language:** **TypeScript**
+- **Styling:** **Tailwind CSS** (Custom configured for Notion-style aesthetics)
+- **bundling:** No build step required (ESM modules via CDN).
+- **Libraries:**
+  - `marked` & `dompurify`: Secure Markdown rendering.
+  - `js-yaml`: Robust Frontmatter parsing.
+  - `jszip`: Client-side backup generation.
 
-## 5. Project Structure
-
-```
-.
-├── components/              # React components
-│   ├── icons/               # SVG icon components
-│   ├── BackupManager.tsx
-│   ├── Dashboard.tsx        # Main dashboard container
-│   ├── DirectoryPicker.tsx
-│   ├── GithubConnect.tsx
-│   ├── ImageList.tsx        # "Manage Images" tab UI
-│   ├── NewPostCreator.tsx   # "Create" tab UI and logic
-│   ├── PostList.tsx         # "Manage" tab UI and logic
-│   ├── PostPreviewModal.tsx
-│   └── TemplateGenerator.tsx
-├── services/                # API interaction logic
-│   └── githubService.ts
-├── utils/                   # Helper functions
-│   ├── crypto.ts            # Encryption/decryption logic
-│   └── parsing.ts           # Markdown parsing, slugify, etc.
-├── App.tsx                  # Main application component
-├── index.html               # Entry point, includes Tailwind CSS and import map
-├── index.tsx                # Renders the React application
-├── types.ts                 # TypeScript type definitions
-└── README.md
-```
-
-## 6. Setup and Installation
+## 5. Setup and Installation
 
 As a purely client-side application, there is no server-side setup required.
 
-1.  **Prerequisites:** A modern web browser.
-2.  **Running the App:**
-    - Clone or download the project files.
-    - Open `index.html` directly in your browser. For best results, serving the files with a simple local web server is recommended.
-      ```bash
-      # Using Python
-      python -m http.server
-
-      # Or using npm's live-server
-      npx live-server
-      ```
-3.  **Generate a GitHub Fine-Grained Token:** Go to your [GitHub Developer Settings](https://github.com/settings/tokens/new?type=beta) and generate a new "Fine-Grained" token. Select the specific repository you want to manage and grant it **Repository Permissions** for **"Contents"** with **"Read and write"** access.
-4.  **Use the App:** Open the running application in your browser, paste your repository URL and the token, and start managing your content.
+1.  **Clone/Download:** Get the `index.html` and associated files.
+2.  **Serve:** Run via a local server (e.g., `python -m http.server` or `npx live-server`).
+3.  **Login:** Enter your GitHub credentials.
+4.  **Configure:** Follow the setup wizard.

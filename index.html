@@ -1,30 +1,62 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Astro Content Manager</title>
+    <title>Astro CM</title>
 
     <!-- SEO & Social Sharing Meta Tags -->
-    <meta name="description" content="An interface to upload Markdown/MDX posts and images directly to your Astro project's GitHub repository, simplifying your content workflow." />
+    <meta name="description" content="An interface to upload Markdown/MDX posts and images directly to your project's repository on GitHub, Gitea, or Gogs, simplifying your content workflow." />
     
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="Astro Content Manager" />
-    <meta property="og:description" content="An interface to upload Markdown/MDX posts and images directly to your Astro project's GitHub repository, simplifying your content workflow." />
-    <meta property="og:image" content="https://raw.githubusercontent.com/tienledigital/astro-content-manager/main/.github/assets/app-preview.png" />
+    <meta property="og:title" content="Astro CM" />
+    <meta property="og:description" content="An interface to upload Markdown/MDX posts and images directly to your project's repository on GitHub, Gitea, or Gogs, simplifying your content workflow." />
+    <meta property="og:image" content="https://raw.githubusercontent.com/tienledigital/AstroCM/main/.github/assets/app-preview.png" />
     
     <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Astro Content Manager" />
-    <meta name="twitter:description" content="An interface to upload Markdown/MDX posts and images directly to your Astro project's GitHub repository, simplifying your content workflow." />
-    <meta name="twitter:image" content="https://raw.githubusercontent.com/tienledigital/astro-content-manager/main/.github/assets/app-preview.png" />
+    <meta name="twitter:title" content="Astro CM" />
+    <meta name="twitter:description" content="An interface to upload Markdown/MDX posts and images directly to your project's repository on GitHub, Gitea, or Gogs, simplifying your content workflow." />
+    <meta name="twitter:image" content="https://raw.githubusercontent.com/tienledigital/AstroCM/main/.github/assets/app-preview.png" />
 
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22currentColor%22 stroke-width=%221.5%22><circle cx=%2212%22 cy=%2212%22 r=%228%22/><ellipse cx=%2212%22 cy=%2212%22 rx=%2211%22 ry=%224%22 transform=%22rotate(-30 12 12)%22/></svg>">
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>❄️</text></svg>">
+    
+    <!-- Fonts: Inter for UI -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Tailwind CSS with Typography Plugin -->
+    <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'sans-serif'],
+            },
+            colors: {
+              notion: {
+                bg: '#FFFFFF',
+                sidebar: '#F7F7F5', // Notion sidebar gray
+                hover: '#EFEFEF',   // Notion hover gray
+                text: '#37352F',    // Notion primary text
+                muted: '#787774',   // Notion secondary text
+                border: '#E9E9E7',  // Notion border
+                select: '#E3E2E0',  // Notion selection
+                blue: '#2383E2',    // Notion blue (links/buttons)
+              }
+            }
+          }
+        }
+      }
+    </script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/js-yaml@4.1.0/dist/js-yaml.min.js"></script>
 <script type="importmap">
 {
   "imports": {
@@ -35,76 +67,43 @@
 }
 </script>
 <style>
+  body {
+    background-color: #FFFFFF;
+    color: #37352F;
+  }
   body.login-bg {
-    background-color: #f9fafb; /* gray-50 */
-    background-image: radial-gradient(circle at 1px 1px, #e5e7eb /* gray-200 */ 1px, transparent 0);
-    background-size: 20px 20px;
+    background-color: #F7F7F5;
   }
-  .markdown-preview h1, .markdown-preview h2, .markdown-preview h3, .markdown-preview h4, .markdown-preview h5, .markdown-preview h6 {
-    margin-top: 1.5em;
-    margin-bottom: 0.75em;
+  
+  /* Scrollbar styling to be more subtle like Notion */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
   }
-  .markdown-preview h1, .markdown-preview h2 {
-    border-bottom: 1px solid #d0d7de;
-    padding-bottom: .3em;
+  ::-webkit-scrollbar-track {
+    background: transparent;
   }
-  .markdown-preview h1 {
-    font-size: 2em;
+  ::-webkit-scrollbar-thumb {
+    background: #D3D1CB;
+    border-radius: 5px;
+    border: 2px solid transparent;
+    background-clip: content-box;
   }
-  .markdown-preview h2 {
-    font-size: 1.5em;
+  ::-webkit-scrollbar-thumb:hover {
+    background: #A09F9B;
+    border: 2px solid transparent;
+    background-clip: content-box;
   }
-  .markdown-preview p, .markdown-preview ul, .markdown-preview ol, .markdown-preview blockquote, .markdown-preview pre, .markdown-preview table {
-    margin-bottom: 1.25rem;
-  }
-  .markdown-preview ul, .markdown-preview ol {
-    padding-left: 2em;
-  }
-  .markdown-preview li {
-    margin-top: 0.25em;
-  }
-  .markdown-preview blockquote {
-    border-left: .25em solid #d0d7de;
-    padding: 0 1em;
-    color: #57606a;
-  }
-  .markdown-preview code:not(pre > code) {
-    background-color: rgba(27,31,36,0.07);
-    border-radius: 6px;
-    padding: .2em .4em;
-    font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
-    font-size: 85%;
-  }
-  .markdown-preview pre {
-    background-color: #f6f8fa;
-    border-radius: 6px;
-    padding: 16px;
-    overflow: auto;
-  }
-  .markdown-preview pre > code {
-    background-color: transparent;
-    padding: 0;
-    font-size: 100%;
-  }
-  .markdown-preview table {
-    width: 100%;
-    border-collapse: collapse;
-    display: table;
-  }
-  .markdown-preview th, .markdown-preview td {
-    border: 1px solid #d0d7de;
-    padding: 6px 13px;
-  }
-  .markdown-preview tr {
-    border-top: 1px solid #d0d7de;
-  }
-    .markdown-preview tr:nth-child(2n) {
-    background-color: #f6f8fa;
+
+  /* Markdown Preview Overrides */
+  .markdown-preview {
+    font-family: 'Inter', sans-serif;
+    color: #37352F;
   }
 </style>
 <link rel="stylesheet" href="/index.css">
 </head>
-<body class="text-gray-800 font-sans antialiased">
+<body>
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
 </body>

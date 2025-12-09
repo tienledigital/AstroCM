@@ -1,4 +1,4 @@
-# Astro Content Manager
+# Astro CM
 > **Version:** 1.4.0 (Stable)
 
 A simple, clean web interface to upload Markdown/MDX posts and images directly to your project's repository on **GitHub**. Streamline your content workflow without leaving the browser.

@@ -275,7 +275,7 @@ const App: React.FC = () => {
             
             <footer className="absolute bottom-4 left-0 right-0 text-center text-gray-400 text-xs">
                 <div className="flex flex-col sm:flex-row justify-center items-center space-y-2 sm:space-y-0 sm:space-x-4">
-                    <a href="https://github.com/tienledigital/astro-content-manager" target="_blank" rel="noopener noreferrer" className="inline-flex items-center hover:text-notion-text transition-colors">
+                    <a href="https://github.com/tienledigital/AstroCM" target="_blank" rel="noopener noreferrer" className="inline-flex items-center hover:text-notion-text transition-colors">
                         <GithubIcon className="w-3.5 h-3.5 mr-1.5 opacity-80" />
                         Astro CM v1.4.0
                     </a>

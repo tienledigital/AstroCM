@@ -1,10 +1,11 @@
+
 # Astro Content Manager
 > **Version:** 1.4.0 (Stable)
 
 A simple, clean web interface to upload Markdown/MDX posts and images directly to your project's repository on **GitHub**. Streamline your content workflow without leaving the browser.
 
 <p align="center">
-  <img src=".github/assets/screenshot-1.png" width="90%" alt="Astro Content Manager Preview">
+  <img src="https://raw.githubusercontent.com/tienledigital/AstroCM/main/.github/assets/screenshot-1.png" width="100%" alt="Astro Content Manager Preview">
 </p>
 
 **Quick Links:** [Project Overview](./OVERVIEW.md) • [Changelog](./CHANGELOG.md) • [Licenses](./LICENSES.md)
@@ -58,14 +59,14 @@ For a detailed guide on setup, functionality, and the technical stack, please se
 ## 🖼️ Screenshots
 
 <p align="center">
-  <img src=".github/assets/screenshot-2.png" width="32%" alt="Dashboard View">
-  <img src=".github/assets/screenshot-3.png" width="32%" alt="Post Management">
-  <img src=".github/assets/screenshot-4.png" width="32%" alt="New Post Creator">
+  <img src="https://raw.githubusercontent.com/tienledigital/AstroCM/main/.github/assets/screenshot-2.png" width="32%" alt="Dashboard View">
+  <img src="https://raw.githubusercontent.com/tienledigital/AstroCM/main/.github/assets/screenshot-3.png" width="32%" alt="Post Management">
+  <img src="https://raw.githubusercontent.com/tienledigital/AstroCM/main/.github/assets/screenshot-4.png" width="32%" alt="New Post Creator">
 </p>
 <p align="center">
-  <img src=".github/assets/screenshot-5.png" width="32%" alt="Settings Page">
-  <img src=".github/assets/screenshot-6.png" width="32%" alt="Image Management">
-  <img src=".github/assets/screenshot-7.png" width="32%" alt="Template Management">
+  <img src="https://raw.githubusercontent.com/tienledigital/AstroCM/main/.github/assets/screenshot-5.png" width="32%" alt="Settings Page">
+  <img src="https://raw.githubusercontent.com/tienledigital/AstroCM/main/.github/assets/screenshot-6.png" width="32%" alt="Image Management">
+  <img src="https://raw.githubusercontent.com/tienledigital/AstroCM/main/.github/assets/screenshot-7.png" width="32%" alt="Template Management">
 </p>
 
 ---

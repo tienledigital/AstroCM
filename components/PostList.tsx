@@ -1,27 +1,29 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { GithubRepo } from '../types';
-import * as githubService from '../services/githubService';
-import { parseMarkdown, updateFrontmatter, ParsedMarkdown, escapeRegExp } from '../utils/parsing';
-import { compressImage } from '../utils/image';
-import { SpinnerIcon } from './icons/SpinnerIcon';
-import { ImageIcon } from './icons/ImageIcon';
-import { EditIcon } from './icons/EditIcon';
-import { PhotoIcon } from './icons/PhotoIcon';
-import { TrashIcon } from './icons/TrashIcon';
-import PostPreviewModal from './PostPreviewModal';
-import { SearchIcon } from './icons/SearchIcon';
-import { useI18n } from '../i18n/I18nContext';
-import { ExclamationTriangleIcon } from './icons/ExclamationTriangleIcon';
 
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { IGitService, GithubRepo, ProjectType } from '../types';
+import { parseMarkdown, updateFrontmatter } from '../utils/parsing';
+import { useI18n } from '../i18n/I18nContext';
+import { SpinnerIcon } from './icons/SpinnerIcon';
+import { SearchIcon } from './icons/SearchIcon';
+import { ViewListIcon } from './icons/ViewListIcon';
+import { ViewGridIcon } from './icons/ViewGridIcon';
+import { UploadIcon } from './icons/UploadIcon';
+import { TrashIcon } from './icons/TrashIcon';
+import { DocumentIcon } from './icons/DocumentIcon';
+import { ImageIcon } from './icons/ImageIcon';
+import PostDetailView from './PostDetailView';
+import PostUploadValidationModal from './PostUploadValidationModal';
+import PostImageSelectionModal from './PostImageSelectionModal';
+import { ConfirmationModal } from './ConfirmationModal';
 
 interface PostListProps {
-  token: string;
+  gitService: IGitService;
   repo: GithubRepo;
   path: string;
   imagesPath: string;
   domainUrl: string;
-  projectType: 'astro' | 'github';
-  onPostUpdate: (filePath: string, file: File) => Promise<void>;
+  projectType: ProjectType;
+  onPostUpdate: () => void;
   postFileTypes: string;
   imageFileTypes: string;
   newImageCommitTemplate: string;
@@ -29,24 +31,33 @@ interface PostListProps {
   imageCompressionEnabled: boolean;
   maxImageSize: number;
   imageResizeMaxWidth: number;
+  onAction: () => void;
 }
 
-export interface PostData extends ParsedMarkdown {
-  sha: string;
-  name: string;
-  html_url: string;
-  path: string;
+type SortOption = 'date-desc' | 'date-asc' | 'title-asc' | 'title-desc';
+
+interface PostData {
+  frontmatter: Record<string, any>;
+  body: string;
   rawContent: string;
+  name: string;
+  sha: string;
+  path: string;
+  html_url: string;
+  thumbnailUrl: string | null;
 }
 
-const POSTS_PER_PAGE = 20;
-
-const ThumbnailWithAuth: React.FC<{ token: string, repo: GithubRepo, imagePath: string }> = ({ token, repo, imagePath }) => {
+// Component to handle authenticated image loading for private repos
+const ThumbnailWithAuth: React.FC<{ gitService: IGitService, imagePath: string, className?: string }> = ({ gitService, imagePath, className = "h-full w-full object-cover" }) => {
     const [imageUrl, setImageUrl] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        // If it's a full URL, just use it directly. No need to fetch via API.
+        if (!imagePath) {
+            setIsLoading(false);
+            return;
+        }
+        
         if (imagePath.startsWith('http')) {
             setImageUrl(imagePath);
             setIsLoading(false);
@@ -58,15 +69,16 @@ const ThumbnailWithAuth: React.FC<{ token: string, repo: GithubRepo, imagePath: 
 
         const fetchBlob = async () => {
             setIsLoading(true);
+            // Remove leading slash if present for API call
             const fullPath = imagePath.startsWith('/') ? imagePath.substring(1) : imagePath;
             try {
-                const blob = await githubService.getFileAsBlob(token, repo.owner.login, repo.name, fullPath);
+                const blob = await gitService.getFileAsBlob(fullPath);
                 if (isMounted) {
                     objectUrl = URL.createObjectURL(blob);
                     setImageUrl(objectUrl);
                 }
             } catch (e) {
-                console.error(`Failed to fetch blob for ${fullPath}`, e);
+                // console.error(`Failed to fetch blob for ${fullPath}`, e);
                 if (isMounted) setImageUrl(null);
             } finally {
                 if (isMounted) setIsLoading(false);
@@ -81,212 +93,321 @@ const ThumbnailWithAuth: React.FC<{ token: string, repo: GithubRepo, imagePath: 
                 URL.revokeObjectURL(objectUrl);
             }
         };
-    }, [token, repo, imagePath]);
+    }, [gitService, imagePath]);
     
     if (isLoading) {
-        return <div className="flex items-center justify-center w-full h-full"><SpinnerIcon className="w-6 h-6 animate-spin text-gray-400" /></div>;
+        return <div className={`flex items-center justify-center bg-gray-50 ${className}`}><SpinnerIcon className="w-3 h-3 animate-spin text-gray-400" /></div>;
     }
 
     if (!imageUrl) {
-        return <ImageIcon className="h-10 w-10 text-gray-300" />;
+        return <div className={`flex items-center justify-center bg-gray-50 ${className}`}><ImageIcon className="text-gray-300 w-1/2 h-1/2" /></div>;
     }
 
-    return <img src={imageUrl} alt="Thumbnail" className="h-full w-full object-cover" />;
+    return <img src={imageUrl} alt="Thumbnail" className={className} />;
 };
 
-const PostList: React.FC<PostListProps> = ({ 
-    token, repo, path, imagesPath, domainUrl, projectType, onPostUpdate, 
-    postFileTypes, imageFileTypes, newImageCommitTemplate, updatePostCommitTemplate,
-    imageCompressionEnabled, maxImageSize, imageResizeMaxWidth
+const PostList: React.FC<PostListProps> = ({
+  gitService,
+  repo,
+  path,
+  imagesPath, // Needed for potential relative path resolution logic if expanded
+  domainUrl,
+  projectType,
+  onPostUpdate,
+  postFileTypes,
+  imageFileTypes,
+  updatePostCommitTemplate,
+  onAction
 }) => {
+  const { t, language } = useI18n();
   const [posts, setPosts] = useState<PostData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isUpdating, setIsUpdating] = useState<string | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [viewMode, setViewMode] = useState<'grid' | 'table'>('table');
   const [searchQuery, setSearchQuery] = useState('');
-  const { t } = useI18n();
-  const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
+  const [sortOption, setSortOption] = useState<SortOption>('date-desc');
+  const [currentPage, setCurrentPage] = useState(1);
+  const POSTS_PER_PAGE = 20;
 
-  const mdFileInputRef = useRef<HTMLInputElement>(null);
-  const imageFileInputRef = useRef<HTMLInputElement>(null);
-  
-  const [editingPost, setEditingPost] = useState<PostData | null>(null);
-  const [changingImageForPost, setChangingImageForPost] = useState<PostData | null>(null);
-  const [postToPreview, setPostToPreview] = useState<PostData | null>(null);
+  const [selectedPost, setSelectedPost] = useState<PostData | null>(null);
+  const [postToDelete, setPostToDelete] = useState<PostData | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
+  // Upload state
+  const uploadPostInputRef = useRef<HTMLInputElement>(null);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
 
-  const fetchPosts = useCallback(async () => {
-    if (!path) {
-      setPosts([]);
-      setIsLoading(false);
-      return;
-    }
+  // Update specific post file state
+  const updatePostFileInputRef = useRef<HTMLInputElement>(null);
+  const [postToUpdateFile, setPostToUpdateFile] = useState<PostData | null>(null);
+
+  // Update specific post image state
+  const [isImageModalOpen, setIsImageModalOpen] = useState(false);
+  const [postToUpdateImage, setPostToUpdateImage] = useState<PostData | null>(null);
+
+  // Columns Configuration
+  const [visibleFields, setVisibleFields] = useState<string[]>(['author', 'category', 'date']);
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    const columnsKey = `postTableColumns_${repo.full_name}`;
+    const widthsKey = `postTableColumnWidths_${repo.full_name}`;
     
+    const savedColumnsStr = localStorage.getItem(columnsKey);
+    const savedWidthsStr = localStorage.getItem(widthsKey);
+    
+    if (savedColumnsStr) {
+         try {
+             setVisibleFields(JSON.parse(savedColumnsStr));
+         } catch {
+             // Keep defaults
+         }
+    }
+
+    if (savedWidthsStr) {
+        try {
+            setColumnWidths(JSON.parse(savedWidthsStr));
+        } catch {
+            setColumnWidths({});
+        }
+    }
+  }, [repo.full_name]);
+
+  const fetchPosts = async () => {
+    if (!path) {
+        setPosts([]);
+        setIsLoading(false);
+        return;
+    }
     setIsLoading(true);
     setError(null);
-    
     try {
-      const items = await githubService.getRepoContents(token, repo.owner.login, repo.name, path);
-      const postFiles = items.filter(item => item.type === 'file' && (item.name.endsWith('.md') || item.name.endsWith('.mdx')));
+        const files = await gitService.listFiles(path);
+        const mdFiles = files.filter(f => f.type === 'file' && (f.name.endsWith('.md') || f.name.endsWith('.mdx')));
+        
+        const postDataPromises = mdFiles.map(async (file) => {
+            try {
+                const content = await gitService.getFileContent(file.path);
+                const { frontmatter, thumbnailUrl, body } = parseMarkdown(content);
+                return {
+                    frontmatter,
+                    body,
+                    rawContent: content,
+                    name: file.name,
+                    sha: file.sha || '',
+                    path: file.path,
+                    html_url: file.url || '',
+                    thumbnailUrl
+                } as PostData;
+            } catch (e) {
+                console.error(`Failed to parse ${file.name}`, e);
+                return null;
+            }
+        });
 
-      const postsData = await Promise.all(
-        postFiles.map(async (file) => {
-          try {
-              const content = await githubService.getFileContent(token, repo.owner.login, repo.name, file.path);
-              const parsed = parseMarkdown(content);
-              return {
-                  ...parsed,
-                  sha: file.sha,
-                  name: file.name,
-                  html_url: file.html_url,
-                  path: file.path,
-                  rawContent: content,
-              };
-          } catch(e) {
-              console.error(`Failed to process file ${file.path}:`, e);
-              return null;
-          }
-        })
-      );
-      
-      const validPosts = postsData.filter((p): p is PostData => p !== null);
-      validPosts.sort((a,b) => {
-        const dateA = a.frontmatter.publishDate || a.frontmatter.date || 'a';
-        const dateB = b.frontmatter.publishDate || b.frontmatter.date || 'b';
-        return dateB.localeCompare(dateA);
-      });
-      setPosts(validPosts);
-      setCurrentPage(1);
-
+        const results = await Promise.all(postDataPromises);
+        setPosts(results.filter((p): p is PostData => p !== null));
+        onPostUpdate(); // Update stats
     } catch (err) {
-      if (err instanceof Error && err.message.includes('404')) {
-        setError(t('postList.error.dirNotFound', { path }));
-      } else {
-        setError(err instanceof Error ? err.message : 'Failed to fetch posts.');
-      }
+        if (err instanceof Error && err.message.includes('404')) {
+            setError(t('postList.error.dirNotFound', { path }));
+        } else {
+            setError(t('app.error.unknown'));
+        }
     } finally {
-      setIsLoading(false);
+        setIsLoading(false);
     }
-  }, [token, repo, path, t]);
+  };
 
   useEffect(() => {
     fetchPosts();
-  }, [fetchPosts]);
+  }, [path, gitService]);
 
-  const handleEditClick = (post: PostData) => {
-    setEditingPost(post);
-    mdFileInputRef.current?.click();
+  const filteredPosts = useMemo(() => {
+      let result = posts;
+      if (searchQuery) {
+          const q = searchQuery.toLowerCase();
+          result = result.filter(p => 
+              p.name.toLowerCase().includes(q) || 
+              (p.frontmatter.title && String(p.frontmatter.title).toLowerCase().includes(q)) ||
+              (p.frontmatter.author && String(p.frontmatter.author).toLowerCase().includes(q))
+          );
+      }
+      
+      result.sort((a, b) => {
+          const dateA = new Date(a.frontmatter.date || a.frontmatter.publishDate || 0).getTime();
+          const dateB = new Date(b.frontmatter.date || b.frontmatter.publishDate || 0).getTime();
+          const titleA = (a.frontmatter.title || a.name).toLowerCase();
+          const titleB = (b.frontmatter.title || b.name).toLowerCase();
+
+          if (sortOption === 'date-desc') return dateB - dateA;
+          if (sortOption === 'date-asc') return dateA - dateB;
+          if (sortOption === 'title-asc') return titleA.localeCompare(titleB);
+          if (sortOption === 'title-desc') return titleB.localeCompare(titleA);
+          return 0;
+      });
+
+      return result;
+  }, [posts, searchQuery, sortOption]);
+
+  const totalPages = Math.ceil(filteredPosts.length / POSTS_PER_PAGE);
+  const currentPosts = filteredPosts.slice((currentPage - 1) * POSTS_PER_PAGE, currentPage * POSTS_PER_PAGE);
+
+  // --- Actions ---
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (e.target.files && e.target.files[0]) {
+          setUploadFile(e.target.files[0]);
+          setIsUploadModalOpen(true);
+          e.target.value = '';
+      }
   };
 
-  const handleMdFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file && editingPost) {
-      setIsUpdating(editingPost.sha);
-      setError(null);
+  const confirmUpload = async () => {
+      if (!uploadFile) return;
+      setIsUploading(true);
       try {
-        await onPostUpdate(editingPost.path, file);
-        await fetchPosts();
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to update post.');
+          const reader = new FileReader();
+          reader.onload = async (e) => {
+              const content = e.target?.result as string;
+              const commitMsg = `feat(content): add post "${uploadFile.name}"`;
+              const filePath = path ? `${path}/${uploadFile.name}` : uploadFile.name;
+              
+              await gitService.createFileFromString(filePath, content, commitMsg);
+              onAction();
+              fetchPosts();
+              setIsUploadModalOpen(false);
+              setUploadFile(null);
+          };
+          reader.readAsText(uploadFile);
+      } catch (e) {
+          alert("Upload failed");
       } finally {
-        setIsUpdating(null);
-        setEditingPost(null);
-        if (mdFileInputRef.current) {
-          mdFileInputRef.current.value = '';
-        }
+          setIsUploading(false);
       }
-    }
   };
 
-  const handleChangeImageClick = (post: PostData) => {
-    setChangingImageForPost(post);
-    imageFileInputRef.current?.click();
+  // Update specific post file
+  const handleUpdatePostFile = (post: PostData) => {
+      setPostToUpdateFile(post);
+      updatePostFileInputRef.current?.click();
   };
 
-  const handleImageFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const imageFile = event.target.files?.[0];
-    if (!imageFile || !changingImageForPost) return;
+  const confirmUpdatePostFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file || !postToUpdateFile) return;
 
-    setIsUpdating(changingImageForPost.sha);
-    setError(null);
-
-    try {
-      const fileToUpload = imageCompressionEnabled
-        ? await compressImage(imageFile, maxImageSize, imageResizeMaxWidth)
-        : imageFile;
-
-      const imageCommitMessage = newImageCommitTemplate.replace('{filename}', fileToUpload.name);
-      const fullImagePath = imagesPath ? `${imagesPath}/${fileToUpload.name}` : fileToUpload.name;
-      await githubService.uploadFile(token, repo.owner.login, repo.name, fullImagePath, fileToUpload, imageCommitMessage);
-      
-      let contentToUpdate = changingImageForPost.rawContent;
-
-      // If compression changed the filename, replace all occurrences in the post content
-      if (imageFile.name !== fileToUpload.name) {
-        const regex = new RegExp(escapeRegExp(imageFile.name), 'g');
-        contentToUpdate = contentToUpdate.replace(regex, fileToUpload.name);
+      setIsUploading(true);
+      try {
+          const reader = new FileReader();
+          reader.onload = async (ev) => {
+              const content = ev.target?.result as string;
+              const commitMsg = updatePostCommitTemplate.replace('{filename}', postToUpdateFile.name) || `fix(content): update post "${postToUpdateFile.name}"`;
+              
+              await gitService.updateFileContent(postToUpdateFile.path, content, commitMsg, postToUpdateFile.sha);
+              onAction();
+              fetchPosts();
+              setPostToUpdateFile(null);
+          };
+          reader.readAsText(file);
+      } catch (err) {
+          alert("Update failed");
+      } finally {
+          setIsUploading(false);
+          e.target.value = '';
       }
-
-      // Also explicitly update the main `image` frontmatter key to be safe
-      let publicPath = imagesPath;
-      if (publicPath.startsWith('public/')) {
-          publicPath = publicPath.substring('public/'.length);
-      } else if (publicPath === 'public') {
-          publicPath = '';
-      }
-      const urlParts = [publicPath, fileToUpload.name].filter(Boolean);
-      const newImageUrl = `/${urlParts.join('/')}`;
-
-      const finalContent = updateFrontmatter(contentToUpdate, { image: newImageUrl });
-      
-      const postUpdateCommitMessage = updatePostCommitTemplate.replace('{filename}', changingImageForPost.name);
-      await githubService.updateFileContent(token, repo.owner.login, repo.name, changingImageForPost.path, finalContent, postUpdateCommitMessage, changingImageForPost.sha);
-
-      await fetchPosts();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update post image.');
-    } finally {
-      setIsUpdating(null);
-      setChangingImageForPost(null);
-      if (imageFileInputRef.current) {
-        imageFileInputRef.current.value = '';
-      }
-    }
   };
 
-  const handleDeleteClick = async (post: PostData) => {
-    if (window.confirm(t('postList.deleteConfirm', { name: post.name }))) {
-        setIsUpdating(post.sha);
-        setError(null);
-        try {
-            const commitMessage = `chore: delete post "${post.name}"`;
-            await githubService.deleteFile(token, repo.owner.login, repo.name, post.path, post.sha, commitMessage);
-            setPostToPreview(null);
-            await fetchPosts();
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'Failed to delete post.');
-        } finally {
-            setIsUpdating(null);
-        }
-    }
+  // Update specific post image
+  const handleUpdateImage = (post: PostData) => {
+      setPostToUpdateImage(post);
+      setIsImageModalOpen(true);
   };
 
+  const handleImageConfirm = async (result: { type: 'new' | 'existing', file?: File, path?: string }) => {
+      if (!postToUpdateImage) return;
+      setIsUploading(true);
+      try {
+          let imageUrl = '';
+          // 1. Upload if new
+          if (result.type === 'new' && result.file) {
+              const commitMsg = `feat(assets): add image "${result.file.name}"`;
+              const fullPath = imagesPath ? `${imagesPath}/${result.file.name}` : result.file.name;
+              await gitService.uploadFile(fullPath, result.file, commitMsg);
+              imageUrl = fullPath;
+          } else if (result.type === 'existing' && result.path) {
+              imageUrl = result.path;
+          }
+
+          if (imageUrl) {
+              // Format URL based on project settings
+              let finalUrl = imageUrl;
+              if (projectType === 'astro' && domainUrl) {
+                  let relPath = imageUrl;
+                  if (relPath.startsWith('public/')) relPath = relPath.replace('public/', '/');
+                  else if (!relPath.startsWith('/')) relPath = '/' + relPath;
+                  const cleanDomain = domainUrl.replace(/\/$/, '');
+                  finalUrl = `${cleanDomain}${relPath}`;
+              } else {
+                  // Keep relative path or cleanup for other types if needed
+                  if (imageUrl.startsWith('public/')) finalUrl = imageUrl.replace('public/', '/');
+                  else if (!imageUrl.startsWith('/')) finalUrl = '/' + imageUrl;
+              }
+
+              // 2. Update Frontmatter
+              // Determine which field to update
+              const fm = postToUpdateImage.frontmatter;
+              let targetField = 'image';
+              if (fm.cover) targetField = 'cover';
+              else if (fm.thumbnail) targetField = 'thumbnail';
+              else if (fm.heroImage) targetField = 'heroImage';
+
+              const newContent = updateFrontmatter(postToUpdateImage.rawContent, { [targetField]: finalUrl });
+              const commitMsg = `fix(content): update image for "${postToUpdateImage.name}"`;
+              
+              await gitService.updateFileContent(postToUpdateImage.path, newContent, commitMsg, postToUpdateImage.sha);
+              onAction();
+              fetchPosts();
+          }
+      } catch (e) {
+          alert("Failed to update image");
+          console.error(e);
+      } finally {
+          setIsUploading(false);
+          setIsImageModalOpen(false);
+          setPostToUpdateImage(null);
+      }
+  };
+
+  const confirmDelete = async () => {
+      if (!postToDelete) return;
+      setIsDeleting(true);
+      try {
+          const commitMsg = `chore(content): delete post "${postToDelete.name}"`;
+          await gitService.deleteFile(postToDelete.path, postToDelete.sha, commitMsg);
+          onAction();
+          fetchPosts();
+          if (selectedPost?.path === postToDelete.path) setSelectedPost(null);
+      } catch (e) {
+          alert("Delete failed");
+      } finally {
+          setIsDeleting(false);
+          setPostToDelete(null);
+      }
+  };
+
+  // Helper to resolve image URLs for display
   const resolveImageUrl = (thumbnailUrl: string | null): string | null | 'needs-domain' => {
     if (!thumbnailUrl) return null;
-
-    if (thumbnailUrl.startsWith('http')) {
-        return thumbnailUrl;
-    }
+    if (thumbnailUrl.startsWith('http')) return thumbnailUrl;
     
-    // In github mode, if repo is private, component handles it. If public, we generate URL.
-    if (projectType === 'github') {
-        if (repo.private) return thumbnailUrl; // Path for the component
+    if (projectType === 'github' && !repo.private) {
         const path = thumbnailUrl.startsWith('/') ? thumbnailUrl : `/${thumbnailUrl}`;
         return `https://raw.githubusercontent.com/${repo.full_name}/${repo.default_branch}${path}`;
     }
 
-    // Astro/Next.js (web project) logic
     if (thumbnailUrl.startsWith('/')) {
         if (domainUrl) {
             return `${domainUrl.replace(/\/$/, '')}${thumbnailUrl}`;
@@ -294,216 +415,333 @@ const PostList: React.FC<PostListProps> = ({
             return 'needs-domain';
         }
     }
-    
-    // Cannot resolve relative paths reliably without more context for web projects.
-    return null;
+    return null; 
   };
 
-  const renderValue = (key: string, value: any) => {
-    if (Array.isArray(value) && value.length > 0) {
+  const renderDynamicCell = (post: PostData, field: string) => {
+      // Date handling
+      if (field.toLowerCase().includes('date')) {
+          let dateVal = post.frontmatter[field];
+          if (!dateVal && field === 'date') {
+               // Fallback common date fields
+               dateVal = post.frontmatter.publishDate || post.frontmatter.pubDate;
+          }
+          if (dateVal) {
+             const d = dateVal instanceof Date ? dateVal : new Date(dateVal);
+             if (!isNaN(d.getTime())) {
+                 const dateOptions: Intl.DateTimeFormatOptions = language === 'vi' 
+                    ? { year: 'numeric', month: '2-digit', day: '2-digit' } 
+                    : { year: 'numeric', month: 'short', day: 'numeric' };
+                 return <span className="text-notion-text text-xs whitespace-nowrap">{d.toLocaleDateString(language === 'vi' ? 'vi-VN' : 'en-US', dateOptions)}</span>;
+             }
+             return <span className="text-notion-text text-xs whitespace-normal break-words">{String(dateVal)}</span>;
+          }
+          return <span className="text-gray-300 text-xs">-</span>;
+      }
+
+      const val = post.frontmatter[field];
+      if (val === undefined || val === null || val === '') return <span className="text-gray-300 text-xs">-</span>;
+      
+      // Array (Tags) handling - Changed to text with commas
+      if (Array.isArray(val) && val.length > 0) {
         return (
-            <div className="flex flex-wrap gap-1 items-center">
-                {value.map((tag, index) => (
-                    <span key={`${key}-${index}`} className="bg-blue-100 text-blue-800 text-xs font-semibold px-2 py-0.5 rounded-full">
-                        {String(tag)}
-                    </span>
-                ))}
-            </div>
+            <span className="text-notion-text text-xs whitespace-normal break-words leading-snug">
+                {val.join(', ')}
+            </span>
         );
-    }
-    return <span className="text-gray-600 break-words">{String(value)}</span>;
+      }
+      
+      if (typeof val === 'object' && val !== null) {
+        return <span className="text-[10px] text-notion-muted italic">[Object]</span>
+      }
+
+      return <span className="text-notion-text text-xs block whitespace-normal break-words leading-snug line-clamp-2" title={String(val)}>{String(val)}</span>;
   };
-  
-  const filteredPosts = posts.filter(post => {
-    if (!searchQuery) return true;
-    const query = searchQuery.toLowerCase();
-    
-    const titleMatch = post.frontmatter.title?.toLowerCase().includes(query);
-    const filenameMatch = post.name.toLowerCase().includes(query);
-    const authorMatch = post.frontmatter.author?.toLowerCase().includes(query);
-    const categoryMatch = post.frontmatter.category?.toLowerCase().includes(query);
-    
-    const tagsMatch = Array.isArray(post.frontmatter.tags) && 
-                      post.frontmatter.tags.some(tag => 
-                        String(tag).toLowerCase().includes(query)
-                      );
-                      
-    return titleMatch || filenameMatch || authorMatch || categoryMatch || tagsMatch;
-  });
 
-  // Pagination logic
-  const totalPages = Math.ceil(filteredPosts.length / POSTS_PER_PAGE);
-  const startIndex = (currentPage - 1) * POSTS_PER_PAGE;
-  const endIndex = startIndex + POSTS_PER_PAGE;
-  const currentPosts = filteredPosts.slice(startIndex, endIndex);
-
-  if (isLoading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <SpinnerIcon className="animate-spin h-8 w-8 text-blue-600" />
-        <span className="ml-4 text-gray-600">{t('postList.loading')}</span>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-       <div className="p-4 border-l-4 border-red-400 bg-red-50 text-left">
-        <h4 className="font-bold text-red-800">Error</h4>
-        <p className="text-sm text-red-700 mt-1">{error}</p>
-      </div>
-    );
-  }
-  
-  if (posts.length === 0) {
-      return <p className="text-center text-gray-500 p-4">{t('postList.noPosts')}</p>;
+  if (selectedPost) {
+      return (
+          <PostDetailView 
+            post={selectedPost} 
+            onBack={() => setSelectedPost(null)}
+            onDelete={(p) => setPostToDelete(p)}
+            gitService={gitService}
+            repo={repo}
+            projectType={projectType}
+            domainUrl={domainUrl}
+            onUpdate={fetchPosts}
+            imagesPath={imagesPath}
+            imageFileTypes={imageFileTypes}
+            onAction={onAction}
+          />
+      );
   }
 
   return (
-    <>
-      <input type="file" ref={mdFileInputRef} onChange={handleMdFileChange} accept={postFileTypes} className="hidden"/>
-      <input type="file" ref={imageFileInputRef} onChange={handleImageFileChange} accept={imageFileTypes} className="hidden" />
-      {postToPreview && <PostPreviewModal post={postToPreview} onClose={() => setPostToPreview(null)} onDelete={handleDeleteClick} />}
+    <div className="space-y-4">
+      <input type="file" ref={uploadPostInputRef} className="hidden" accept={postFileTypes} onChange={handleFileUpload} />
+      <input type="file" ref={updatePostFileInputRef} className="hidden" accept={postFileTypes} onChange={confirmUpdatePostFile} />
+      
+      {isUploadModalOpen && uploadFile && (
+          <PostUploadValidationModal 
+            file={uploadFile}
+            gitService={gitService}
+            repo={repo}
+            onConfirm={confirmUpload}
+            onCancel={() => { setIsUploadModalOpen(false); setUploadFile(null); }}
+          />
+      )}
 
-      <div className="mb-6 relative">
-        <input
-          type="text"
-          placeholder={t('postList.searchPlaceholder')}
-          value={searchQuery}
-          onChange={(e) => {
-            setSearchQuery(e.target.value);
-            setCurrentPage(1); // Reset to first page on search
-          }}
-          className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-          <SearchIcon className="h-5 w-5 text-gray-400" />
+      {isImageModalOpen && (
+          <PostImageSelectionModal
+            gitService={gitService}
+            imagesPath={imagesPath}
+            imageFileTypes={imageFileTypes}
+            onClose={() => setIsImageModalOpen(false)}
+            onConfirm={handleImageConfirm}
+          />
+      )}
+
+      <ConfirmationModal 
+        isOpen={!!postToDelete}
+        onClose={() => setPostToDelete(null)}
+        onConfirm={confirmDelete}
+        title={t('postList.deleteConfirm', { name: postToDelete?.name || '' })}
+        description={t('postList.deleteConfirm', { name: postToDelete?.name || '' })}
+        confirmLabel={t('postPreview.delete')}
+        isProcessing={isDeleting}
+      />
+
+      {/* Toolbar */}
+      <div className="mb-4 flex flex-col sm:flex-row gap-2 justify-between items-center z-10 relative">
+        <div className="relative flex-grow w-full sm:w-auto max-w-md">
+            <input
+            type="text"
+            placeholder={t('postList.searchPlaceholder')}
+            value={searchQuery}
+            onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1);
+            }}
+            className="w-full pl-8 pr-4 py-1.5 bg-transparent border border-notion-border rounded-sm text-sm focus:outline-none focus:ring-1 focus:ring-notion-blue focus:bg-white transition-all text-notion-text placeholder-notion-muted/70 shadow-sm"
+            />
+            <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
+            <SearchIcon className="h-3.5 w-3.5 text-notion-muted" />
+            </div>
+        </div>
+        
+        <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+            {/* Sort Dropdown */}
+            <div className="relative">
+                <select 
+                    value={sortOption}
+                    onChange={(e) => setSortOption(e.target.value as SortOption)}
+                    className="appearance-none pl-3 pr-8 py-1.5 bg-white border border-notion-border rounded-sm text-xs font-medium text-notion-text focus:outline-none focus:ring-1 focus:ring-notion-blue shadow-sm cursor-pointer hover:bg-gray-50"
+                >
+                    <option value="date-desc">Date (Newest)</option>
+                    <option value="date-asc">Date (Oldest)</option>
+                    <option value="title-asc">Title (A-Z)</option>
+                    <option value="title-desc">Title (Z-A)</option>
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-notion-muted">
+                    <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                </div>
+            </div>
+
+            <div className="flex bg-notion-sidebar p-0.5 rounded-sm border border-notion-border">
+                <button 
+                    onClick={() => setViewMode('table')}
+                    className={`p-1 rounded-sm transition-all ${viewMode === 'table' ? 'bg-white shadow-sm text-notion-text' : 'text-notion-muted hover:text-notion-text hover:bg-gray-200/50'}`}
+                    title={t('postList.viewMode.table')}
+                >
+                    <ViewListIcon className="w-4 h-4" />
+                </button>
+                <button 
+                    onClick={() => setViewMode('grid')}
+                    className={`p-1 rounded-sm transition-all ${viewMode === 'grid' ? 'bg-white shadow-sm text-notion-text' : 'text-notion-muted hover:text-notion-text hover:bg-gray-200/50'}`}
+                    title={t('postList.viewMode.grid')}
+                >
+                    <ViewGridIcon className="w-4 h-4" />
+                </button>
+            </div>
+
+            <button
+                onClick={() => uploadPostInputRef.current?.click()}
+                className="flex items-center justify-center px-3 py-1.5 bg-notion-blue hover:bg-blue-600 text-white text-xs font-medium rounded-sm transition-colors shadow-sm"
+            >
+                <UploadIcon className="w-3.5 h-3.5 mr-1.5" />
+                {t('postList.uploadButton')}
+            </button>
         </div>
       </div>
 
-      {filteredPosts.length === 0 ? (
-        <p className="text-center text-gray-500 p-4">{t('postList.noResults')}</p>
+      {isLoading ? (
+          <div className="flex justify-center items-center h-64">
+              <SpinnerIcon className="w-8 h-8 animate-spin text-notion-muted" />
+              <span className="ml-3 text-notion-muted">{t('postList.loading')}</span>
+          </div>
+      ) : error ? (
+          <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-sm">
+              {error}
+          </div>
+      ) : currentPosts.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-64 border border-dashed border-notion-border rounded-sm bg-gray-50">
+              <DocumentIcon className="w-10 h-10 text-notion-muted mb-2" />
+              <p className="text-notion-muted">{t('postList.noPosts')}</p>
+          </div>
       ) : (
-      <>
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-          {currentPosts.map((post) => {
-              const postDateRaw = post.frontmatter.publishDate || post.frontmatter.date || post.frontmatter.pubDate;
-              const postDate = postDateRaw ? new Date(postDateRaw).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : null;
-              const author = post.frontmatter.author;
-
-              const otherFrontmatter = Object.entries(post.frontmatter)
-                .filter(([key]) => 
-                  !['title', 'image', 'thumbnail', 'cover', 'date', 'publishdate', 'pubdate', 'author', 'excerpt', 'category', 'tags', 'metadata'].includes(key.toLowerCase())
-                );
-
-              return (
-              <div key={post.sha} className="bg-white border border-gray-200 rounded-lg shadow-sm flex flex-col overflow-hidden transition-shadow duration-300 hover:shadow-xl">
-                  <div className="relative h-40 bg-gray-100 flex items-center justify-center overflow-hidden">
-                      { projectType === 'github' && repo.private && post.thumbnailUrl ? (
-                          <ThumbnailWithAuth token={token} repo={repo} imagePath={post.thumbnailUrl} />
-                      ) : (() => {
-                          const resolvedUrl = resolveImageUrl(post.thumbnailUrl);
-                          return resolvedUrl === 'needs-domain' ? (
-                              <div className="p-2 text-center text-xs text-yellow-800 bg-yellow-50 flex items-center">
-                                <ExclamationTriangleIcon className="w-6 h-6 mr-2 flex-shrink-0" />
-                                {t('postList.error.setImageDomain')}
+          <div>
+              {/* Grid or Table View */}
+              {viewMode === 'grid' ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                      {currentPosts.map(post => (
+                          <div 
+                            key={post.sha} 
+                            onClick={() => setSelectedPost(post)}
+                            className="bg-white border border-notion-border rounded-sm hover:shadow-md transition-shadow cursor-pointer overflow-hidden flex flex-col h-full"
+                          >
+                              <div className="h-32 bg-gray-100 overflow-hidden relative border-b border-notion-border">
+                                {projectType === 'github' && repo.private && post.thumbnailUrl ? (
+                                    <ThumbnailWithAuth gitService={gitService} imagePath={post.thumbnailUrl} className="w-full h-full object-cover" />
+                                ) : (() => {
+                                    const resolvedUrl = resolveImageUrl(post.thumbnailUrl);
+                                    if (resolvedUrl && resolvedUrl !== 'needs-domain') {
+                                        return <img src={resolvedUrl} alt="" className="w-full h-full object-cover" onError={(e) => e.currentTarget.style.display = 'none'} />;
+                                    } else {
+                                        return (
+                                            <div className="flex items-center justify-center w-full h-full text-notion-muted">
+                                                <DocumentIcon className="w-8 h-8 opacity-50" />
+                                            </div>
+                                        );
+                                    }
+                                })()}
                               </div>
-                          ) : resolvedUrl && !imageErrors[post.sha] ? (
-                              <img src={resolvedUrl} alt={post.frontmatter.title || 'Thumbnail'} className="h-full w-full object-cover" onError={() => setImageErrors(prev => ({...prev, [post.sha]: true}))} />
-                          ) : (
-                              <ImageIcon className="h-10 w-10 text-gray-300" />
-                          );
-                      })()}
-
-                      {isUpdating === post.sha && (
-                          <div className="absolute inset-0 bg-white bg-opacity-80 flex items-center justify-center">
-                              <SpinnerIcon className="h-8 w-8 animate-spin text-blue-600" />
-                          </div>
-                      )}
-                  </div>
-
-                  <div className="grid grid-cols-2 border-b border-t border-gray-200 divide-x divide-gray-200">
-                      <button onClick={() => handleChangeImageClick(post)} disabled={!!isUpdating} className="flex items-center justify-center text-xs font-medium p-2 text-gray-600 bg-gray-50 hover:bg-gray-100 hover:text-purple-600 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-purple-500 focus:z-10" title={t('postList.updateImage')}>
-                          <PhotoIcon className="w-4 h-4 mr-1.5" />
-                          {t('postList.updateImage')}
-                      </button>
-                      <button onClick={() => handleEditClick(post)} disabled={!!isUpdating} className="flex items-center justify-center text-xs font-medium p-2 text-gray-600 bg-gray-50 hover:bg-gray-100 hover:text-blue-600 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 focus:z-10" title={t('postList.updateFile')}>
-                          <EditIcon className="w-4 h-4 mr-1.5" />
-                          {t('postList.updateFile')}
-                      </button>
-                  </div>
-
-                  <div className="p-4 flex-grow flex flex-col">
-                      <button onClick={() => setPostToPreview(post)} className="font-bold text-base text-gray-800 hover:text-blue-600 leading-tight text-left break-words">
-                          {post.frontmatter.title || post.name}
-                      </button>
-                      
-                      <div className="text-xs text-gray-500 mt-1 mb-2">
-                          {author && <span>{t('postList.by')} <strong>{author}</strong></span>}
-                          {author && postDate && <span className="mx-1">·</span>}
-                          {postDate && <span>{postDate}</span>}
-                      </div>
-
-                      <div className="text-xs text-gray-700 space-y-2 mt-auto pt-3 border-t border-gray-100">
-                          {post.frontmatter.category && (
-                              <div className="grid grid-cols-3 gap-1 items-start">
-                                  <span className="font-semibold capitalize col-span-1">{t('postList.category')}:</span>
-                                  <div className="col-span-2">{renderValue('category', post.frontmatter.category)}</div>
-                              </div>
-                          )}
-                          {post.frontmatter.tags && Array.isArray(post.frontmatter.tags) && post.frontmatter.tags.length > 0 && (
-                              <div className="grid grid-cols-3 gap-1 items-start">
-                                  <span className="font-semibold capitalize col-span-1">{t('postList.tags')}:</span>
-                                  <div className="col-span-2">
-                                      <div className="flex flex-wrap gap-1 items-center">
-                                          {post.frontmatter.tags.slice(0, 2).map((tag, index) => (
-                                              <span key={`tag-${index}`} className="bg-blue-100 text-blue-800 text-xs font-semibold px-2 py-0.5 rounded-full">
-                                                  {String(tag)}
-                                              </span>
-                                          ))}
-                                          {post.frontmatter.tags.length > 2 && (
-                                              <span className="text-gray-500 text-xs font-medium ml-1">{t('postList.more', { count: post.frontmatter.tags.length - 2 })}</span>
-                                          )}
-                                      </div>
+                              <div className="p-4 flex-grow">
+                                  <h3 className="text-sm font-semibold text-notion-text mb-1 line-clamp-2">{post.frontmatter.title || post.name}</h3>
+                                  <div className="text-xs text-notion-muted line-clamp-3">
+                                      {post.frontmatter.description || post.frontmatter.excerpt || (post.body ? post.body.substring(0, 100) : '')}
                                   </div>
                               </div>
-                          )}
-                          {otherFrontmatter.map(([key, value]) => (
-                              <div key={key} className="grid grid-cols-3 gap-1 items-start">
-                                  <span className="font-semibold capitalize col-span-1">{key}:</span>
-                                  <div className="col-span-2">{renderValue(key, value)}</div>
+                              <div className="px-4 py-2 border-t border-notion-border text-[10px] text-notion-muted flex justify-between items-center bg-gray-50">
+                                  <span>{post.frontmatter.date ? new Date(post.frontmatter.date).toLocaleDateString() : 'No Date'}</span>
+                                  <span>{post.frontmatter.author}</span>
                               </div>
-                          ))}
-                      </div>
+                          </div>
+                      ))}
                   </div>
-              </div>
-          )})}
-        </div>
-        
-        {totalPages > 1 && (
-          <div className="mt-8 flex justify-center items-center space-x-4">
-            <button
-              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-              disabled={currentPage === 1 || isLoading}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {t('postList.pagination.prev')}
-            </button>
-            <span className="text-sm text-gray-700">
-              {t('postList.pagination.pageInfo', { current: currentPage, total: totalPages })}
-            </span>
-            <button
-              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-              disabled={currentPage === totalPages || isLoading}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {t('postList.pagination.next')}
-            </button>
+              ) : (
+                  <div className="border border-notion-border rounded-sm overflow-x-auto bg-white">
+                      <table className="w-full divide-y divide-notion-border text-sm table-fixed">
+                          <colgroup>
+                              <col style={{ width: `${columnWidths['__name__'] || 35}%` }} />
+                              {visibleFields.map(field => (
+                                  <col key={field} style={{ width: `${columnWidths[field] || 15}%` }} />
+                              ))}
+                              <col style={{ width: '100px' }} />
+                          </colgroup>
+                          <thead className="bg-notion-sidebar text-notion-muted font-semibold">
+                              <tr>
+                                  <th className="px-4 py-2 text-left text-xs font-normal border-r border-notion-border uppercase tracking-wide select-none truncate">
+                                    Name
+                                  </th>
+                                  {visibleFields.map(field => (
+                                      <th key={field} className="px-4 py-2 text-left text-xs font-normal border-r border-notion-border uppercase tracking-wide select-none truncate">
+                                          {field}
+                                      </th>
+                                  ))}
+                                  <th className="px-4 py-2 w-10"></th>
+                              </tr>
+                          </thead>
+                          <tbody className="divide-y divide-notion-border">
+                              {currentPosts.map(post => (
+                                  <tr key={post.sha} onClick={() => setSelectedPost(post)} className="hover:bg-notion-hover/50 cursor-pointer group transition-colors">
+                                      <td className="px-4 py-2 border-r border-notion-border overflow-hidden">
+                                          <div className="flex items-start gap-3">
+                                              {/* Mini Thumbnail */}
+                                              <div className="w-8 h-8 flex-shrink-0 mt-0.5 bg-gray-100 rounded-sm border border-notion-border overflow-hidden">
+                                                  {projectType === 'github' && repo.private && post.thumbnailUrl ? (
+                                                      <ThumbnailWithAuth gitService={gitService} imagePath={post.thumbnailUrl} className="w-full h-full object-cover" />
+                                                  ) : (() => {
+                                                      const resolvedUrl = resolveImageUrl(post.thumbnailUrl);
+                                                      return resolvedUrl && resolvedUrl !== 'needs-domain' ? (
+                                                          <img src={resolvedUrl} alt="" className="w-full h-full object-cover" onError={(e) => e.currentTarget.style.display = 'none'} />
+                                                      ) : (
+                                                          <div className="flex items-center justify-center w-full h-full text-notion-muted">
+                                                              <DocumentIcon className="w-4 h-4" />
+                                                          </div>
+                                                      );
+                                                  })()}
+                                              </div>
+                                              
+                                              <div className="min-w-0">
+                                                  <span className="font-medium text-notion-text block truncate" title={post.frontmatter.title || post.name}>
+                                                      {post.frontmatter.title || post.name}
+                                                  </span>
+                                              </div>
+                                          </div>
+                                      </td>
+                                      
+                                      {visibleFields.map(field => (
+                                          <td key={field} className="px-4 py-2 border-r border-notion-border align-top overflow-hidden">
+                                              {renderDynamicCell(post, field)}
+                                          </td>
+                                      ))}
+
+                                      <td className="px-4 py-2 text-right">
+                                          <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                              <button
+                                                  onClick={(e) => { e.stopPropagation(); handleUpdatePostFile(post); }}
+                                                  className="p-1 text-notion-muted hover:text-notion-text hover:bg-gray-200 rounded-sm transition-colors"
+                                                  title={t('postList.updateFile')}
+                                              >
+                                                  <DocumentIcon className="w-4 h-4" />
+                                              </button>
+                                              <button
+                                                  onClick={(e) => { e.stopPropagation(); handleUpdateImage(post); }}
+                                                  className="p-1 text-notion-muted hover:text-notion-text hover:bg-gray-200 rounded-sm transition-colors"
+                                                  title={t('postList.updateImage')}
+                                              >
+                                                  <ImageIcon className="w-4 h-4" />
+                                              </button>
+                                              <button 
+                                                onClick={(e) => { e.stopPropagation(); setPostToDelete(post); }} 
+                                                className="text-notion-muted hover:text-red-600 hover:bg-red-50 p-1 rounded-sm transition-colors"
+                                              >
+                                                  <TrashIcon className="w-4 h-4" />
+                                              </button>
+                                          </div>
+                                      </td>
+                                  </tr>
+                              ))}
+                          </tbody>
+                      </table>
+                  </div>
+              )}
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                  <div className="mt-4 flex justify-center gap-2">
+                      <button 
+                        disabled={currentPage === 1} 
+                        onClick={() => setCurrentPage(p => p - 1)}
+                        className="px-3 py-1 bg-white border border-notion-border rounded-sm text-xs disabled:opacity-50 hover:bg-notion-hover"
+                      >
+                          {t('postList.pagination.prev')}
+                      </button>
+                      <span className="text-xs flex items-center text-notion-muted">
+                          {t('postList.pagination.pageInfo', { current: currentPage, total: totalPages })}
+                      </span>
+                      <button 
+                        disabled={currentPage === totalPages} 
+                        onClick={() => setCurrentPage(p => p + 1)}
+                        className="px-3 py-1 bg-white border border-notion-border rounded-sm text-xs disabled:opacity-50 hover:bg-notion-hover"
+                      >
+                          {t('postList.pagination.next')}
+                      </button>
+                  </div>
+              )}
           </div>
-        )}
-      </>
       )}
-    </>
+    </div>
   );
 };
 

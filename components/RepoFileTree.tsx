@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { GithubRepo } from '../types';
-import * as githubService from '../services/githubService';
-import { RepoTreeItem } from '../services/githubService';
+import { IGitService, RepoTreeInfo } from '../types';
 import { FolderIcon } from './icons/FolderIcon';
 import { FileIcon } from './icons/FileIcon';
 import { SpinnerIcon } from './icons/SpinnerIcon';
@@ -9,18 +7,17 @@ import { ChevronRightIcon } from './icons/ChevronRightIcon';
 import { StarIcon } from './icons/StarIcon';
 
 interface TreeItemProps {
-    item: RepoTreeItem;
+    item: RepoTreeInfo;
     level: number;
-    token: string;
-    repo: GithubRepo;
+    gitService: IGitService;
     onSelectPath: (path: string) => void;
     selectedPath: string;
     suggestedPaths?: string[];
 }
 
-const TreeItem: React.FC<TreeItemProps> = ({ item, level, token, repo, onSelectPath, selectedPath, suggestedPaths = [] }) => {
+const TreeItem: React.FC<TreeItemProps> = ({ item, level, gitService, onSelectPath, selectedPath, suggestedPaths = [] }) => {
     const [isExpanded, setIsExpanded] = useState(false);
-    const [children, setChildren] = useState<RepoTreeItem[]>([]);
+    const [children, setChildren] = useState<RepoTreeInfo[]>([]);
     const [isLoading, setIsLoading] = useState(false);
 
     const handleToggle = async (e: React.MouseEvent) => {
@@ -30,7 +27,7 @@ const TreeItem: React.FC<TreeItemProps> = ({ item, level, token, repo, onSelectP
         if (!isExpanded && children.length === 0) {
             setIsLoading(true);
             try {
-                const fetchedChildren = await githubService.getRepoTree(token, repo.owner.login, repo.name, item.path);
+                const fetchedChildren = await gitService.getRepoTree(item.path);
                 setChildren(fetchedChildren);
             } catch (error) {
                 console.error("Failed to fetch tree children:", error);
@@ -86,8 +83,7 @@ const TreeItem: React.FC<TreeItemProps> = ({ item, level, token, repo, onSelectP
                             key={child.path}
                             item={child}
                             level={level + 1}
-                            token={token}
-                            repo={repo}
+                            gitService={gitService}
                             onSelectPath={onSelectPath}
                             selectedPath={selectedPath}
                             suggestedPaths={suggestedPaths}
@@ -105,22 +101,21 @@ const TreeItem: React.FC<TreeItemProps> = ({ item, level, token, repo, onSelectP
 };
 
 interface RepoFileTreeProps {
-    token: string;
-    repo: GithubRepo;
+    gitService: IGitService;
     onSelectPath: (path: string) => void;
     selectedPath: string;
     suggestedPaths?: string[];
 }
 
-export const RepoFileTree: React.FC<RepoFileTreeProps> = ({ token, repo, onSelectPath, selectedPath, suggestedPaths = [] }) => {
-    const [rootItems, setRootItems] = useState<RepoTreeItem[]>([]);
+export const RepoFileTree: React.FC<RepoFileTreeProps> = ({ gitService, onSelectPath, selectedPath, suggestedPaths = [] }) => {
+    const [rootItems, setRootItems] = useState<RepoTreeInfo[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
         const fetchRoot = async () => {
             setIsLoading(true);
             try {
-                const items = await githubService.getRepoTree(token, repo.owner.login, repo.name, '');
+                const items = await gitService.getRepoTree();
                 setRootItems(items);
             } catch (error) {
                 console.error("Failed to fetch repo root:", error);
@@ -129,7 +124,7 @@ export const RepoFileTree: React.FC<RepoFileTreeProps> = ({ token, repo, onSelec
             }
         };
         fetchRoot();
-    }, [token, repo]);
+    }, [gitService]);
 
     if (isLoading) {
         return (
@@ -146,8 +141,7 @@ export const RepoFileTree: React.FC<RepoFileTreeProps> = ({ token, repo, onSelec
                     key={item.path} 
                     item={item} 
                     level={0} 
-                    token={token} 
-                    repo={repo} 
+                    gitService={gitService}
                     onSelectPath={onSelectPath}
                     selectedPath={selectedPath}
                     suggestedPaths={suggestedPaths}

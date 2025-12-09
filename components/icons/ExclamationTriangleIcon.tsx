@@ -1,6 +1,7 @@
+
 import React from 'react';
 
-export const ExclamationTriangleIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+export const ExclamationTriangleIcon: React.FC<React.SVGProps<SVGSVGElement> & { title?: string }> = ({ title, ...props }) => (
   <svg 
     xmlns="http://www.w3.org/2000/svg" 
     fill="none" 
@@ -9,6 +10,7 @@ export const ExclamationTriangleIcon: React.FC<React.SVGProps<SVGSVGElement>> = 
     stroke="currentColor" 
     {...props}
   >
+    {title && <title>{title}</title>}
     <path 
       strokeLinecap="round" 
       strokeLinejoin="round" 

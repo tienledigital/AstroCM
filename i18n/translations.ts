@@ -1,3 +1,4 @@
+
 export const translations = {
   en: {
     app: {
@@ -11,24 +12,52 @@ export const translations = {
       },
       error: {
         unknown: 'An unknown error occurred.',
-        invalidRepoUrl: 'Invalid GitHub repository URL. Please check and try again.',
+        invalidRepoUrl: 'Invalid repository URL. Please check and try again.',
+        invalidGiteaUrl: 'Invalid self-hosted instance URL. It must be a valid URL (e.g., https://gitea.example.com).',
         noWritePermissions: 'You do not have write permissions for this repository.',
         loginFailed: 'Login failed: {{message}}',
       }
     },
     githubConnect: {
-      title: 'Astro Content Manager',
-      subtitle: 'Connect to your GitHub repository to start managing content for your Astro project.',
+      title: 'Astro CM',
+      subtitle: 'Connect to your repository to start managing content for your Astro project.',
+      serviceTypeLabel: 'Service Type',
+      serviceTypeGithub: 'GitHub',
+      serviceTypeGitea: 'Gitea',
+      serviceTypeGogs: 'Gogs',
+      instanceUrlLabel: 'Instance URL',
+      instanceUrlPlaceholder: {
+        gitea: 'https://gitea.example.com',
+        gogs: 'https://gogs.example.com',
+      },
       repoUrlLabel: 'Repository URL',
-      repoUrlPlaceholder: 'https://github.com/owner/repo-name',
-      tokenLabel: 'Personal Access Token',
-      tokenPlaceholder: 'github_pat_...',
-      tokenHelp: {
+      repoUrlPlaceholder: {
+        github: 'https://github.com/owner/repo-name',
+        gitea: 'e.g., https://gitea.example.com/owner/repo-name',
+        gogs: 'e.g., https://gogs.example.com/owner/repo-name',
+      },
+      tokenLabel: 'Access Token',
+      tokenPlaceholder: {
+        github: 'github_pat_...',
+        gitea: 'Gitea access token',
+        gogs: 'Gogs access token',
+      },
+      tokenHelpGithub: {
         p1: 'Create a ',
         link: 'Fine-Grained Token',
         p2: ' with ',
         b: '"Contents"',
         p3: ' read & write access for this repository only.',
+      },
+      tokenHelpGitea: {
+        p1: 'Go to your Gitea instance, navigate to ',
+        b: 'Settings > Applications',
+        p2: ' and generate a new token. Ensure it has full repository permissions.',
+      },
+      tokenHelpGogs: {
+        p1: 'Go to your Gogs instance, navigate to ',
+        b: 'Your Settings > Applications',
+        p2: ' and generate a new token. Ensure it has `repo` scope permissions.',
       },
       connecting: 'Connecting...',
       connectButton: 'Connect to Repository',
@@ -36,25 +65,36 @@ export const translations = {
     },
     dashboard: {
       header: {
-        title: 'Managing Repository:',
+        title: 'Manage Posts',
         subtitle: "An overview of your repository's content.",
       },
       stats: {
         posts: 'Total Posts',
         images: 'Total Images',
+        repoStars: 'Stars',
         lastUpdated: 'Last Updated',
         status: 'Status',
         connected: 'Connected',
+        synced: 'Synced',
+        syncing: 'Syncing...',
+        checkPathWarning: 'Count is zero. Consider checking the directory path in Settings.',
+      },
+      syncWarning: {
+        title: 'Repository Syncing',
+        description: 'Your recent changes are being processed by the Git provider. Please wait for the status to become "Synced" before making further changes to avoid conflicts.',
       },
       nav: {
         manage: 'Manage Posts',
-        create: 'Create Post',
+        workflows: 'Workflows',
         manageImages: 'Manage Images',
         template: 'Post Template',
         backup: 'Backup',
         settings: 'Settings',
-        guide: 'Guide',
         menuTitle: 'Menu',
+      },
+      userMenu: {
+        viewProfile: 'View Profile',
+        serviceTooltip: 'Connected via {{service}}',
       },
       setup: {
         scanning: 'Scanning repository for initial configuration...',
@@ -63,12 +103,13 @@ export const translations = {
         explorerTitle: 'Repository Explorer',
         explorerHint: 'Folders with a ★ are suggested based on their content.',
         configTitle: 'Configuration',
-        finishButton: 'Finish Setup',
+        finishButton: 'Finish & Create Config',
+        createConfigHelp: 'This will create a .acmrc.json file in your repo to save these settings for your team.',
         projectTypeDesc: "Choose how you use this repository. This determines how image previews are handled.",
         projectTypeAstroName: "Web Project",
         projectTypeAstroDesc: "For a deployed website like Astro or Next.js. Requires a production domain to preview images.",
-        projectTypeGithubName: "GitHub File Library",
-        projectTypeGithubDesc: "For managing a collection of files. Previews link directly to raw GitHub files.",
+        projectTypeGithubName: "File Library",
+        projectTypeGithubDesc: "For managing a collection of files. Previews link directly to raw files.",
         suggestionsDesc: "We've detected these content directories. Click one to select it. The first suggestion has been pre-selected for you.",
         imagesSuggestionsDesc: "We've also found these image directories. The best suggestion has been pre-selected.",
         noSuggestions: "Could not automatically find a posts directory.",
@@ -77,71 +118,143 @@ export const translations = {
         domainHelp: 'This is required to preview images correctly. We tried to auto-detect it for you.',
       },
       settings: {
-        saveButton: 'Save Settings',
-        saveSuccess: 'Settings saved!',
+        title: 'Application Settings',
+        subtitle: 'Configure your project, workflow, and system preferences.',
+        project: {
+          title: 'Project Configuration',
+        },
+        workflow: {
+          title: 'Workflow Configuration',
+        },
+        system: {
+          title: 'System & Maintenance',
+          languageLabel: 'Interface Language',
+        },
+        saveButton: 'Save Changes',
+        saveSuccess: 'All changes saved!',
+        repoInfo: {
+          public: "Public",
+          private: "Private",
+        },
         projectType: {
-          title: 'Project Type',
-          label: 'Select your project type',
-          help: 'Changing this affects how image URLs are resolved for previews.',
+          label: 'Project Type',
+          help: 'Select "Web Project" for live sites (Astro/Next.js) or "File Library" for basic file management.',
         },
         domain: {
-          title: 'Website Domain',
-          label: 'Production Domain URL',
-          help: 'Used to correctly preview images with root-relative paths (e.g., /images/my-image.jpg).',
-          warning: 'Important: This URL is critical for previewing images in the "Manage Posts" and "Manage Images" tabs. An incorrect URL will result in broken images.'
+          label: 'Production Domain',
+          help: 'Required for "Web Project" to preview root-relative images (e.g., /images/pic.jpg).',
         },
         directories: {
-          title: 'Directory Settings',
           postsLabel: 'Posts Directory',
           imagesLabel: 'Images Directory',
           notSelected: 'Not selected',
           changeButton: 'Change',
         },
         compression: {
-            title: 'Image Compression',
-            enableLabel: 'Enable Compression & Resizing',
-            enableHelp: 'Automatically process images that exceed the maximum size or width before uploading.',
-            maxSizeLabel: 'Max Image Size (MB)',
-            maxSizeHelp: 'Images larger than this will be compressed to JPEG format.',
-            resizeLabel: 'Resize large images',
-            resizeHelp: 'Resize images where the width exceeds this value. Aspect ratio is maintained.',
-            originalSize: 'Keep original size',
+            title: 'Media Optimization',
+            enableLabel: 'Compression & Resizing',
+            enableHelp: 'Automatically optimize images on upload.',
+            maxSizeLabel: 'Max Size (KB)',
+            resizeLabel: 'Max Width (px)',
         },
         creation: {
-            title: 'Post Creation Settings',
-            publishDateLabel: 'Post Publish Date',
-            dateFromFile: 'Use date from file (default)',
-            dateFromSystem: 'Use current system date',
-            publishDateHelp: "Determines the `publishDate` in a new post's frontmatter upon upload.",
+            title: 'Post Defaults',
+            dateFromFile: 'Use date from file frontmatter',
+            dateFromSystem: 'Use current system date on upload',
         },
         commits: {
-          title: 'Commit Message Templates',
-          newPostLabel: 'New Post',
-          updatePostLabel: 'Update Post',
-          newImageLabel: 'New Image',
-          updateImageLabel: "Update Post's Image",
-          help: "You can use `{filename}` as a placeholder in your templates.",
+          title: 'Commit Templates',
+          newPostLabel: 'New Post Message',
+          updatePostLabel: 'Update Post Message',
         },
         fileTypes: {
-          title: 'File Type Settings',
-          postLabel: 'Post File Types',
-          postHelp: 'Comma-separated list of extensions or MIME types.',
-          imageLabel: 'Image File Types',
-          imageHelp: 'Example: `image/*` for all image types.',
+          title: 'File Constraints',
+          postLabel: 'Allowed Post Extensions',
+          imageLabel: 'Allowed Image Types',
         },
         dangerZone: {
-          title: 'Danger Zone',
-          description: "This action will permanently delete all your saved settings for this application from your browser's local storage and reload the page. This is useful if you want to start fresh.",
-          descriptionLogout: "This action will permanently delete all your saved settings, log you out of the application, and return you to the connect screen. This is useful if you want to start fresh.",
-          resetButton: 'Reset All Settings',
-          resetButtonLogout: 'Reset & Log Out',
-          confirm: 'Are you sure you want to reset all settings? This cannot be undone.',
-          confirmLogout: 'Are you sure you want to reset all settings and log out? This cannot be undone.',
-        }
+          title: 'Reset App & Config',
+          descriptionLogout: "This will delete the .acmrc.json configuration file from your repository and reset your local settings. You will need to go through the setup wizard again.",
+          resetButtonLogout: 'Delete Config & Reset',
+          confirmDelete: 'Are you sure? This will delete .acmrc.json from your repo and reset your local configuration.',
+        },
+        importExport: {
+          title: 'Configuration Management',
+          exportButton: 'Export Config',
+          importButton: 'Import Config',
+          importSuccess: 'Configuration imported successfully!',
+          importError: {
+            read: 'Error reading file.',
+            json: 'Invalid JSON file.',
+            validation: 'Invalid configuration format.',
+          },
+        },
       },
       footer: {
         sponsoredBy: 'Sponsored by',
       }
+    },
+    workflows: {
+        title: 'Workflow Library',
+        libraryTitle: 'Available Workflows',
+        libraryDesc: 'Select a workflow to automate your content creation process.',
+        backToLibrary: 'Back to Library',
+        wizard: {
+            title: 'Post Creation Wizard',
+            desc: 'A guided, step-by-step process to upload images, validate content structure, and publish new posts safely.',
+        }
+    },
+    postWorkflow: {
+        title: 'Create New Post',
+        step1: {
+            title: 'Assets',
+            desc: 'Upload images first',
+            uploadTitle: 'Drop images here or click to upload',
+            uploadDesc: 'Supports jpg, png, webp, gif',
+            selected: '{{count}} images selected',
+        },
+        step2: {
+            title: 'Content',
+            desc: 'Upload markdown & map images',
+            uploadTitle: 'Upload Markdown File',
+            uploadDesc: 'Drag & drop or click to browse',
+            mappingTitle: 'Frontmatter Image Mapping',
+            mappingDesc: 'We found image fields in your frontmatter. Select an uploaded image to automatically use its public URL.',
+            field: 'Field',
+            currentValue: 'Current Value',
+            selectImage: 'Select uploaded image...',
+            keepCurrent: '(Keep current value)',
+            noImageFields: 'No common image fields found in frontmatter.',
+            imageValidation: {
+                title: 'Image Link Validation',
+                exists: 'File exists in repository',
+                notFound: 'File NOT found in repository',
+                external: 'External link (Unchecked)',
+                checking: 'Checking...',
+                inContent: 'Images in Markdown Body:',
+                noContentImages: 'No other images found in markdown body.',
+            }
+        },
+        step3: {
+            title: 'Review & Publish',
+            desc: 'Finalize and commit',
+            summary: 'Summary',
+            imagesToUpload: 'Images to upload:',
+            postFile: 'Post file:',
+            frontmatterUpdates: 'Frontmatter updates:',
+            publishButton: 'Publish Now',
+            publishing: 'Publishing...',
+            success: 'Post published successfully!',
+            viewButton: 'View in Manage Posts',
+        },
+        navigation: {
+            next: 'Next',
+            back: 'Back',
+        },
+        errors: {
+            noFile: 'Please upload a markdown file.',
+            validation: 'Validation failed: {{message}}',
+        }
     },
     directoryPicker: {
         title: 'Select a Directory',
@@ -153,6 +266,12 @@ export const translations = {
     },
     postList: {
         loading: 'Loading posts...',
+        viewMode: {
+          grid: 'Grid View',
+          table: 'Table View',
+        },
+        columns: 'Columns',
+        selectColumns: 'Select Fields',
         error: {
             dirNotFound: 'Directory not found: \'{{path}}\'. Please make sure this directory exists in your repository. You can change the target directory from the Settings tab.',
             setImageDomain: "Image not loaded. Please set your website's main domain in Settings to preview images correctly.",
@@ -172,6 +291,52 @@ export const translations = {
             next: 'Next',
         },
         deleteConfirm: 'Are you sure you want to delete "{{name}}"? This action cannot be undone.',
+        uploadButton: 'Upload Post',
+        imageSelection: {
+            title: 'Update Cover Image',
+            tabUpload: 'Upload New',
+            tabSelect: 'Select from Repo',
+            selectPlaceholder: 'Search images...',
+            uploadDesc: 'Click to select or drag and drop',
+            fileExistsWarning: 'Warning: File "{{name}}" already exists in repo. It will be overwritten.',
+            checking: 'Checking...',
+            confirmUpdate: 'Update Image',
+            noImagesFound: 'No images found in images directory.',
+        }
+    },
+    uploadValidation: {
+        title: "Post Validation",
+        subtitle: "Checking \"{{name}}\" before upload...",
+        frontmatter: {
+            section: "Frontmatter Checks",
+            label: "Frontmatter Structure",
+            notFound: "No frontmatter found in file.",
+            valid: "Matches active template.",
+            validBasic: "Valid frontmatter syntax.",
+            missingFields: "Missing fields required by template: {{fields}}",
+            parseError: "Could not parse frontmatter.",
+        },
+        images: {
+            section: "Image Link Checks",
+            scanning: "Scanning links...",
+            noImages: "No image links found in this post.",
+            externalWarning: "External link. Could not verify availability (might be CORS blocked).",
+            externalError: "External link seems broken or unreachable.",
+            externalValid: "External image link is accessible.",
+            foundRepo: "File exists in repository.",
+            notFoundRepo: "File NOT found in repository. This will cause a 404.",
+        },
+        summary: {
+            success: "All checks passed!",
+            warning: "Warnings found. Review before uploading.",
+            error: "Critical errors found. Fix before uploading.",
+        },
+        cancel: "Cancel",
+        confirm: "Confirm Upload",
+        confirmWarning: "Upload Anyway",
+        error: {
+            fileRead: "Could not read file content.",
+        }
     },
     imageList: {
         loading: 'Loading images...',
@@ -188,6 +353,9 @@ export const translations = {
         delete: 'Delete',
         copyUrlButton: 'Copy URL',
         urlCopied: 'Copied!',
+        downloadButton: 'Download',
+        upload: "Upload Images",
+        uploading: "Uploading...",
         infoBanner: {
           title: 'Viewing as a File Library',
           description: 'Image previews are fetched directly from your repository, and now work for private repositories too. To preview images as they would appear on a live site, change the "Project Type" to a Web Project in Settings and provide a domain URL.',
@@ -201,6 +369,15 @@ export const translations = {
             pageInfo: 'Page {{current}} of {{total}}',
             next: 'Next',
         },
+    },
+    imageUploadModal: {
+        title: 'Upload Images',
+        noFiles: 'No files selected.',
+        exists: 'File already exists.',
+        overwriteOption: 'Overwrite?',
+        ready: 'Ready to upload.',
+        cancel: 'Cancel',
+        upload: 'Upload {{count}} File(s)',
     },
     postPreview: {
         tabMetadata: 'Metadata',
@@ -267,17 +444,26 @@ export const translations = {
         info: 'If no template is set, the "Create Post" feature will use default, less strict validation rules. Setting a template is highly recommended for consistency.',
         uploadTitle: 'Upload a post file to generate a custom template',
         uploadDesc: '.md or .mdx',
+        or: 'OR',
+        scanRepoTitle: 'Select from Repository',
+        scanRepoDesc: 'Scan your posts directory to find a file.',
+        scanButton: 'Scan Directory',
+        selectPlaceholder: 'Select a post...',
+        loading: 'Scanning...',
         processing: 'Processing...',
         error: {
             noFrontmatter: 'No frontmatter found in the uploaded file.',
             parse: 'Failed to parse file.',
-            read: 'Could not read the file.'
+            read: 'Could not read the file.',
+            noPostsInRepo: 'No markdown files found in the posts directory.',
+            fetchPosts: 'Failed to scan posts directory.',
+            noPostsPath: 'No posts directory configured in Settings.',
         },
         previewTitle: 'Generated Template Preview',
         saveButton: 'Save as Active Template',
         activeTitle: 'Current Active Template',
         defaultTitle: 'Default Template (Active)',
-        downloadButton: 'Download Sample File',
+        downloadButton: 'Download Sample',
         useDefaultButton: 'Use Default Template',
         success: {
             saved: 'Template saved successfully!',
@@ -286,25 +472,50 @@ export const translations = {
         table: {
             field: 'Field Name',
             type: 'Expected Type',
+        },
+        columns: {
+            title: 'Default Table Columns',
+            description: 'Select up to 5 fields you want to see by default in the "Manage Posts" table view.',
+            maxReached: 'Maximum {{max}} columns reached. Deselect one to add another.',
         }
     },
     backupManager: {
+        title: 'Backup & Export',
+        description: 'Create and download .zip archives of your content.',
+        create: {
+          title: "Create Backup",
+          description: "Generate a .zip archive of your content or image directories. You can then download it to your computer.",
+          successTitle: "Backup Ready!",
+          downloadButton: "Download .zip",
+          newBackupButton: "Create New Backup"
+        },
+        config: {
+            title: 'Configuration Backup',
+            description: 'Download the .acmrc.json configuration file for this project.',
+            button: 'Download Config',
+            notFound: 'Configuration file (.acmrc.json) not found in repository.'
+        },
         posts: {
-            title: 'Backup Posts',
+            title: 'Posts Backup',
             description: 'Create a .zip archive of all markdown files from your content directory: {{path}}',
             button: 'Backup All Posts',
             zipping: 'Zipping posts...',
+            filesFound: "{{count}} post files found",
+            createButton: "Create Posts Backup"
         },
         images: {
-            title: 'Backup Images',
+            title: 'Images Backup',
             description: 'Create a .zip archive of all files from your assets directory: {{path}}',
             button: 'Backup All Images',
             zipping: 'Zipping images...',
+            filesFound: "{{count}} image files found",
+            createButton: "Create Images Backup"
         },
-        error: 'Backup failed.',
-        errorDetail: 'Error: {{message}}',
-        success: 'Downloaded {{count}} files.',
-        noFiles: 'No files found to backup.',
+        error: {
+          general: 'Backup failed.',
+          detail: 'Error: {{message}}',
+          noFiles: "No files found in this directory to back up.",
+        },
         zipError: 'JSZip library is not loaded.',
     },
     fileUploader: {
@@ -314,120 +525,13 @@ export const translations = {
         success: 'Successfully uploaded {{name}}!',
         error: 'An unknown error occurred during upload.',
     },
-    guide: {
-        title: "Astro Content Manager Guide",
-        welcome: {
-          title: "Welcome!",
-          p1: "Hello, I'm your Astro developer. I'm happy to give you an overview of the Astro Content Manager application's structure and functionality. This is a very interesting and well-designed app!"
-        },
-        overview: {
-          title: "Application Overview",
-          purposeLabel: "Main Purpose:",
-          purposeText: "\"Astro Content Manager\" is a client-side Web UI that allows you to manage content (Markdown/MDX posts and images) directly in your GitHub repository. It's especially useful for projects built with Astro.js. The goal is to simplify your workflow, helping you publish and update content without needing complex Git commands or a local development environment.",
-          techLabel: "Technology Stack:",
-          tech: {
-            framework: "Frontend Framework: React and TypeScript.",
-            styling: "Styling: Tailwind CSS for rapid and consistent UI development.",
-            api: "API Interaction: Uses the browser's native",
-            apiText: "API to call the GitHub REST API.",
-            libs: "External Libraries (via CDN):",
-            libsMarked: "To render Markdown into HTML securely.",
-            libsJsZip: "To create",
-            libsJsZip2: "archives for the backup feature.",
-            special: "Special Feature:",
-            specialText: "This application requires no build step. It uses an",
-            specialText2: "in",
-            specialText3: "to load React modules directly, allowing you to run it immediately just by opening the",
-            specialText4: "file in your browser."
-          }
-        },
-        workflow: {
-          title: "Workflow",
-          intro: "Here's how the application works from start to finish:",
-          step1: {
-            title: "Login & Connection:",
-            li1: "The user accesses the app and sees the GitHub connection screen.",
-            li2: {
-              t1: "They enter their",
-              strong1: "Repository URL",
-              t2: "and a GitHub",
-              strong2: "Fine-Grained Personal Access Token (PAT).",
-              t3: "This token needs",
-              code1: "Read and write",
-              t4: "permissions for the repository's",
-              code2: "Contents.",
-              t5: ""
-            }
-          },
-          step2: {
-            title: "Authentication & Encryption:",
-            li1: "The application validates the token and checks repository permissions.",
-            li2: {
-              t1: "If successful, the app encrypts the token using the",
-              t2: "and stores it in the browser's",
-              t3: ". This is much more secure than storing the token as plain text."
-            },
-            li3: "After saving, the app displays the main Dashboard interface."
-          },
-          step3: {
-            title: "First-Time Setup:",
-            li1: {
-              t1: "When first accessing a repository's Dashboard, the app automatically scans for directories containing Markdown files (e.g.,",
-            },
-            li2: {
-              t1: "It suggests these directories for you to select as your posts directory. Your choice is saved in",
-              t2: "to streamline future visits."
-            }
-          },
-          step4: {
-            title: "Content Management:",
-            li1: "The user interacts with the tabs on the Dashboard. All actions (reading, creating, editing, deleting files) are converted into corresponding API calls to GitHub.",
-            li2: "Each action creates a new commit in the repository."
-          },
-          step5: {
-            title: "Session End:",
-            li1: {
-              t1: "When the user clicks \"Log Out\" or closes the browser tab,",
-              t2: "is automatically cleared, removing the encrypted token and key, ensuring security."
-            }
-          }
-        },
-        structure: {
-          title: "Code Structure and Key File Roles",
-          index: "The root HTML file, the starting point.",
-          app: "The root component of the entire application, manages login state.",
-          service: "The \"heart\" of the interaction with the GitHub API.",
-          utils: "Directory containing utility functions like encryption and Markdown parsing.",
-          components: "Directory containing all React components:",
-          componentsDashboard: "The main interface after logging in.",
-          componentsPostList: "Displays the list of posts.",
-          componentsNewPost: "The interface for creating a new post.",
-          componentsTemplate: "Generates a frontmatter template for validation.",
-          componentsBackup: "Provides backup functionality.",
-          componentsPicker: "The directory selection modal."
-        },
-        i18n: {
-            title: 'Internationalization (i18n) System',
-            p1: 'The application fully supports English and Vietnamese. The logic is managed in the',
-            p1_code1: 'i18n/',
-            p1_cont: 'directory. When you need to add new text, add a key and its corresponding value for both languages in the',
-            p1_code2: 'translations.ts',
-            p1_cont2: 'file, then call the',
-            p1_code3: "t('your.key')",
-            p1_cont3: 'function from the',
-            p1_code4: 'useI18n()',
-            p1_cont4: 'hook in your component. The selected language is saved in',
-            p1_code5: 'localStorage',
-            p1_cont5: 'to persist across sessions.'
-        },
-        updating: {
-            title: "Updating the Application",
-            p1: "Because this is a completely client-side application that runs directly in the browser, updating to the latest version is very simple.",
-            p2: "If you have cloned the project from GitHub, just navigate to the project directory on your computer and run the following command to get the latest updates:",
-            code: "git pull origin main",
-            p3: "After that, simply reload the `index.html` file in your browser, and you will be using the newest version!"
-        }
-      }
+    language: {
+      en: 'English',
+      vi: 'Tiếng Việt',
+    },
+    languageSwitcher: {
+        modalTitle: 'Select Language',
+    },
   },
   vi: {
     app: {
@@ -441,24 +545,52 @@ export const translations = {
       },
       error: {
         unknown: 'Đã xảy ra lỗi không xác định.',
-        invalidRepoUrl: 'URL kho chứa GitHub không hợp lệ. Vui lòng kiểm tra lại.',
+        invalidRepoUrl: 'URL kho chứa không hợp lệ. Vui lòng kiểm tra lại.',
+        invalidGiteaUrl: 'URL instance self-hosted không hợp lệ. Phải là một URL hợp lệ (ví dụ: https://gitea.example.com).',
         noWritePermissions: 'Bạn không có quyền ghi vào kho chứa này.',
         loginFailed: 'Đăng nhập thất bại: {{message}}',
       }
     },
     githubConnect: {
-      title: 'Astro Content Manager',
-      subtitle: 'Kết nối với kho chứa GitHub của bạn để bắt đầu quản lý nội dung cho dự án Astro.',
+      title: 'Astro CM',
+      subtitle: 'Kết nối với kho chứa của bạn để bắt đầu quản lý nội dung cho dự án Astro.',
+      serviceTypeLabel: 'Loại Dịch vụ',
+      serviceTypeGithub: 'GitHub',
+      serviceTypeGitea: 'Gitea',
+      serviceTypeGogs: 'Gogs',
+      instanceUrlLabel: 'URL Instance',
+      instanceUrlPlaceholder: {
+        gitea: 'https://gitea.example.com',
+        gogs: 'https://gogs.example.com',
+      },
       repoUrlLabel: 'URL Kho chứa',
-      repoUrlPlaceholder: 'https://github.com/owner/repo-name',
-      tokenLabel: 'Personal Access Token',
-      tokenPlaceholder: 'github_pat_...',
-      tokenHelp: {
+      repoUrlPlaceholder: {
+        github: 'https://github.com/owner/repo-name',
+        gitea: 'VD: https://gitea.example.com/owner/repo-name',
+        gogs: 'VD: https://gogs.example.com/owner/repo-name',
+      },
+      tokenLabel: 'Access Token',
+      tokenPlaceholder: {
+        github: 'github_pat_...',
+        gitea: 'Token truy cập Gitea',
+        gogs: 'Token truy cập Gogs',
+      },
+      tokenHelpGithub: {
         p1: 'Tạo một ',
         link: 'Fine-Grained Token',
         p2: ' với quyền ',
         b: '"Contents"',
         p3: ' đọc & ghi chỉ cho kho chứa này.',
+      },
+      tokenHelpGitea: {
+        p1: 'Truy cập Gitea instance của bạn, đi đến ',
+        b: 'Settings > Applications',
+        p2: ' và tạo một token mới. Đảm bảo nó có đầy đủ quyền truy cập vào kho chứa.',
+      },
+      tokenHelpGogs: {
+        p1: 'Truy cập Gogs instance của bạn, đi đến ',
+        b: 'Your Settings > Applications',
+        p2: ' và tạo một token mới. Đảm bảo nó có quyền trong phạm vi `repo`.',
       },
       connecting: 'Đang kết nối...',
       connectButton: 'Kết nối tới Kho chứa',
@@ -466,25 +598,36 @@ export const translations = {
     },
     dashboard: {
       header: {
-        title: 'Đang quản lý Kho chứa:',
+        title: 'Quản lý Bài viết',
         subtitle: 'Tổng quan về nội dung trong kho chứa của bạn.',
       },
       stats: {
         posts: 'Tổng số Bài viết',
         images: 'Tổng số Hình ảnh',
+        repoStars: 'Sao',
         lastUpdated: 'Cập nhật lần cuối',
         status: 'Trạng thái',
         connected: 'Đã kết nối',
+        synced: 'Đã đồng bộ',
+        syncing: 'Đang đồng bộ...',
+        checkPathWarning: 'Số lượng là 0. Cân nhắc kiểm tra lại đường dẫn thư mục trong Cài đặt.',
+      },
+      syncWarning: {
+        title: 'Kho chứa đang đồng bộ',
+        description: 'Các thay đổi gần đây của bạn đang được xử lý. Vui lòng đợi trạng thái chuyển thành "Đã đồng bộ" trước khi thực hiện thêm thay đổi để tránh xung đột.',
       },
       nav: {
         manage: 'Quản lý Bài viết',
-        create: 'Tạo Bài viết',
+        workflows: 'Workflows',
         manageImages: 'Quản lý Hình ảnh',
         template: 'Mẫu Bài viết',
         backup: 'Sao lưu',
         settings: 'Cài đặt',
-        guide: 'Hướng dẫn',
         menuTitle: 'Trình đơn',
+      },
+      userMenu: {
+        viewProfile: 'Xem Hồ sơ',
+        serviceTooltip: 'Đã kết nối qua {{service}}',
       },
       setup: {
         scanning: 'Đang quét kho chứa để lấy cấu hình ban đầu...',
@@ -493,12 +636,13 @@ export const translations = {
         explorerTitle: 'Trình khám phá Kho chứa',
         explorerHint: 'Các thư mục có dấu ★ được gợi ý dựa trên nội dung của chúng.',
         configTitle: 'Cấu hình',
-        finishButton: 'Hoàn tất Cài đặt',
+        finishButton: 'Hoàn tất & Tạo Config',
+        createConfigHelp: 'Sẽ tạo file .acmrc.json trong kho chứa để lưu cài đặt này cho cả nhóm.',
         projectTypeDesc: "Chọn cách bạn sử dụng kho chứa này. Điều này quyết định cách xem trước hình ảnh.",
         projectTypeAstroName: "Dự án Web",
         projectTypeAstroDesc: "Dành cho một website đã triển khai như Astro hoặc Next.js. Yêu cầu tên miền production để xem trước ảnh.",
-        projectTypeGithubName: "Thư viện File trên GitHub",
-        projectTypeGithubDesc: "Dành cho quản lý bộ sưu tập file. Ảnh xem trước sẽ liên kết trực tiếp đến GitHub.",
+        projectTypeGithubName: "Thư viện File",
+        projectTypeGithubDesc: "Dành cho quản lý bộ sưu tập file. Previews liên kết trực tiếp đến file thô.",
         suggestionsDesc: "Chúng tôi đã phát hiện các thư mục nội dung này. Nhấp vào một thư mục để chọn. Gợi ý đầu tiên đã được chọn sẵn cho bạn.",
         imagesSuggestionsDesc: "Chúng tôi cũng đã tìm thấy các thư mục hình ảnh này. Gợi ý tốt nhất đã được chọn sẵn.",
         noSuggestions: 'Không thể tự động tìm thấy thư mục bài viết.',
@@ -507,71 +651,143 @@ export const translations = {
         domainHelp: 'Điều này là bắt buộc để xem trước hình ảnh. Chúng tôi đã cố gắng tự động phát hiện nó cho bạn.',
       },
       settings: {
-        saveButton: 'Lưu Cài đặt',
-        saveSuccess: 'Đã lưu cài đặt!',
+        title: 'Cài đặt Ứng dụng',
+        subtitle: 'Cấu hình dự án, quy trình làm việc và hệ thống của bạn.',
+        project: {
+          title: 'Cấu hình Dự án',
+        },
+        workflow: {
+          title: 'Quy trình làm việc',
+        },
+        system: {
+          title: 'Hệ thống & Bảo trì',
+          languageLabel: 'Ngôn ngữ Giao diện',
+        },
+        saveButton: 'Lưu Thay đổi',
+        saveSuccess: 'Đã lưu tất cả thay đổi!',
+        repoInfo: {
+          public: "Công khai",
+          private: "Riêng tư",
+        },
         projectType: {
-          title: 'Loại Dự án',
-          label: 'Chọn loại dự án của bạn',
-          help: 'Thay đổi tùy chọn này sẽ ảnh hưởng đến cách URL hình ảnh được hiển thị để xem trước.',
+          label: 'Loại Dự án',
+          help: 'Chọn "Dự án Web" cho website (Astro/Next.js) hoặc "Thư viện File" để quản lý file cơ bản.',
         },
         domain: {
-          title: 'Tên miền Website',
-          label: 'URL Tên miền Production',
-          help: 'Dùng để xem trước hình ảnh có đường dẫn tương đối gốc (ví dụ: /images/my-image.jpg).',
-          warning: 'Quan trọng: URL này rất quan trọng để xem trước hình ảnh trong các tab "Quản lý Bài viết" và "Quản lý Hình ảnh". URL không chính xác sẽ dẫn đến ảnh bị lỗi.'
+          label: 'Tên miền Production',
+          help: 'Cần thiết cho "Dự án Web" để xem trước ảnh có đường dẫn tương đối (vd: /images/pic.jpg).',
         },
         directories: {
-          title: 'Cài đặt Thư mục',
           postsLabel: 'Thư mục Bài viết',
           imagesLabel: 'Thư mục Hình ảnh',
           notSelected: 'Chưa chọn',
           changeButton: 'Thay đổi',
         },
         compression: {
-            title: 'Nén & Chỉnh kích thước Ảnh',
-            enableLabel: 'Bật Nén & Chỉnh sửa',
-            enableHelp: 'Tự động xử lý ảnh vượt quá kích thước hoặc chiều rộng tối đa trước khi tải lên.',
-            maxSizeLabel: 'Kích thước ảnh tối đa (MB)',
-            maxSizeHelp: 'Ảnh lớn hơn kích thước này sẽ bị nén sang định dạng JPEG.',
-            resizeLabel: 'Chỉnh lại kích thước ảnh lớn',
-            resizeHelp: 'Thay đổi kích thước ảnh có chiều rộng vượt quá giá trị này. Tỷ lệ khung hình được giữ nguyên.',
-            originalSize: 'Giữ kích thước gốc',
+            title: 'Tối ưu hóa Media',
+            enableLabel: 'Nén & Resize',
+            enableHelp: 'Tự động tối ưu ảnh khi tải lên.',
+            maxSizeLabel: 'Kích thước tối đa (KB)',
+            resizeLabel: 'Chiều rộng tối đa (px)',
         },
         creation: {
-            title: 'Cài đặt Tạo Bài viết',
-            publishDateLabel: 'Ngày đăng bài',
-            dateFromFile: 'Sử dụng ngày từ file (mặc định)',
-            dateFromSystem: 'Sử dụng ngày hệ thống hiện tại',
-            publishDateHelp: "Xác định `publishDate` trong frontmatter của bài viết mới khi tải lên.",
+            title: 'Mặc định Bài viết',
+            dateFromFile: 'Dùng ngày từ file',
+            dateFromSystem: 'Dùng ngày hệ thống',
         },
         commits: {
-          title: 'Mẫu Tin nhắn Commit',
-          newPostLabel: 'Bài viết Mới',
-          updatePostLabel: 'Cập nhật Bài viết',
-          newImageLabel: 'Hình ảnh Mới',
-          updateImageLabel: 'Cập nhật Hình ảnh của Bài viết',
-          help: "Bạn có thể sử dụng `{filename}` làm placeholder trong mẫu.",
+          title: 'Mẫu Commit',
+          newPostLabel: 'Tin nhắn Bài mới',
+          updatePostLabel: 'Tin nhắn Cập nhật',
         },
         fileTypes: {
-          title: 'Cài đặt Loại File',
-          postLabel: 'Loại file Bài viết',
-          postHelp: 'Danh sách các phần mở rộng hoặc loại MIME, cách nhau bởi dấu phẩy.',
+          title: 'Giới hạn File',
+          postLabel: 'Đuôi file Bài viết',
           imageLabel: 'Loại file Hình ảnh',
-          imageHelp: 'Ví dụ: `image/*` cho tất cả các loại ảnh.',
         },
         dangerZone: {
-          title: 'Khu vực Nguy hiểm',
-          description: 'Hành động này sẽ xóa vĩnh viễn tất cả cài đặt đã lưu của bạn cho ứng dụng này khỏi bộ nhớ cục bộ của trình duyệt và tải lại trang. Điều này hữu ích nếu bạn muốn bắt đầu lại từ đầu.',
-          descriptionLogout: "Hành động này sẽ xóa vĩnh viễn tất cả cài đặt của bạn, đăng xuất khỏi ứng dụng và đưa bạn trở về màn hình kết nối. Điều này hữu ích nếu bạn muốn bắt đầu lại từ đầu.",
-          resetButton: 'Reset Tất cả Cài đặt',
-          resetButtonLogout: 'Reset & Đăng xuất',
-          confirm: 'Bạn có chắc chắn muốn reset tất cả cài đặt không? Hành động này không thể hoàn tác.',
-          confirmLogout: 'Bạn có chắc chắn muốn reset tất cả cài đặt và đăng xuất không? Hành động này không thể hoàn tác.',
-        }
+          title: 'Reset App & Config',
+          descriptionLogout: "Thao tác này sẽ xóa file cấu hình .acmrc.json khỏi kho chứa của bạn và đặt lại cài đặt cục bộ. Bạn sẽ cần thực hiện lại wizard cài đặt.",
+          resetButtonLogout: 'Xóa Config & Reset',
+          confirmDelete: 'Bạn có chắc chắn không? Hành động này sẽ xóa file .acmrc.json trên repo và đặt lại cài đặt cục bộ.',
+        },
+        importExport: {
+          title: 'Quản lý Cấu hình',
+          exportButton: 'Xuất Config',
+          importButton: 'Nhập Config',
+          importSuccess: 'Cấu hình đã được nhập thành công!',
+          importError: {
+            read: 'Lỗi đọc file.',
+            json: 'File JSON không hợp lệ.',
+            validation: 'Định dạng cấu hình không hợp lệ.',
+          },
+        },
       },
       footer: {
         sponsoredBy: 'Được tài trợ bởi',
       }
+    },
+    workflows: {
+        title: 'Thư viện Workflow',
+        libraryTitle: 'Các Workflow khả dụng',
+        libraryDesc: 'Chọn một quy trình để tự động hóa việc tạo nội dung của bạn.',
+        backToLibrary: 'Quay lại Thư viện',
+        wizard: {
+            title: 'Wizard Tạo Bài Viết',
+            desc: 'Quy trình từng bước được hướng dẫn để tải ảnh, xác thực cấu trúc nội dung và xuất bản bài viết mới an toàn.',
+        }
+    },
+    postWorkflow: {
+        title: 'Tạo Bài Viết Mới',
+        step1: {
+            title: 'Tài nguyên',
+            desc: 'Tải hình ảnh lên trước',
+            uploadTitle: 'Kéo thả ảnh vào đây hoặc nhấp để tải lên',
+            uploadDesc: 'Hỗ trợ jpg, png, webp, gif',
+            selected: 'Đã chọn {{count}} hình ảnh',
+        },
+        step2: {
+            title: 'Nội dung',
+            desc: 'Tải markdown & gán ảnh',
+            uploadTitle: 'Tải lên File Markdown',
+            uploadDesc: 'Kéo thả hoặc nhấp để chọn file',
+            mappingTitle: 'Gán Hình ảnh vào Frontmatter',
+            mappingDesc: 'Tìm thấy các trường hình ảnh trong frontmatter. Chọn một ảnh vừa tải lên để tự động điền đường dẫn public.',
+            field: 'Trường',
+            currentValue: 'Giá trị hiện tại',
+            selectImage: 'Chọn ảnh đã tải lên...',
+            keepCurrent: '(Giữ giá trị hiện tại)',
+            noImageFields: 'Không tìm thấy trường hình ảnh nào trong frontmatter.',
+            imageValidation: {
+                title: 'Kiểm tra Link Hình ảnh',
+                exists: 'File tồn tại trong kho chứa',
+                notFound: 'KHÔNG tìm thấy file trong kho chứa',
+                external: 'Link ngoài (Chưa kiểm tra)',
+                checking: 'Đang kiểm tra...',
+                inContent: 'Hình ảnh trong Nội dung Markdown:',
+                noContentImages: 'Không tìm thấy hình ảnh nào khác trong nội dung markdown.',
+            }
+        },
+        step3: {
+            title: 'Xem lại & Xuất bản',
+            desc: 'Hoàn tất và commit',
+            summary: 'Tóm tắt',
+            imagesToUpload: 'Hình ảnh sẽ tải lên:',
+            postFile: 'File bài viết:',
+            frontmatterUpdates: 'Cập nhật Frontmatter:',
+            publishButton: 'Xuất bản Ngay',
+            publishing: 'Đang xuất bản...',
+            success: 'Đã xuất bản bài viết thành công!',
+            viewButton: 'Xem trong Quản lý Bài viết',
+        },
+        navigation: {
+            next: 'Tiếp theo',
+            back: 'Quay lại',
+        },
+        errors: {
+            noFile: 'Vui lòng tải lên một file markdown.',
+            validation: 'Lỗi xác thực: {{message}}',
+        }
     },
     directoryPicker: {
         title: 'Chọn một Thư mục',
@@ -583,6 +799,12 @@ export const translations = {
     },
     postList: {
         loading: 'Đang tải bài viết...',
+        viewMode: {
+          grid: 'Dạng Lưới',
+          table: 'Dạng Bảng',
+        },
+        columns: 'Cột',
+        selectColumns: 'Chọn Trường',
         error: {
             dirNotFound: 'Không tìm thấy thư mục: \'{{path}}\'. Vui lòng đảm bảo thư mục này tồn tại trong kho chứa của bạn. Bạn có thể thay đổi thư mục đích trong tab Cài đặt.',
             setImageDomain: "Không tải được ảnh. Vui lòng đặt tên miền chính của website trong Cài đặt để xem trước ảnh.",
@@ -602,6 +824,52 @@ export const translations = {
             next: 'Sau',
         },
         deleteConfirm: 'Bạn có chắc chắn muốn xóa "{{name}}"? Hành động này không thể hoàn tác.',
+        uploadButton: 'Tải Bài viết',
+        imageSelection: {
+            title: 'Cập nhật Ảnh bìa',
+            tabUpload: 'Tải Mới',
+            tabSelect: 'Chọn từ Repo',
+            selectPlaceholder: 'Tìm ảnh...',
+            uploadDesc: 'Nhấp để chọn hoặc kéo thả ảnh',
+            fileExistsWarning: 'Cảnh báo: File "{{name}}" đã tồn tại. Sẽ bị ghi đè.',
+            checking: 'Đang kiểm tra...',
+            confirmUpdate: 'Cập nhật Ảnh',
+            noImagesFound: 'Không tìm thấy ảnh nào trong thư mục hình ảnh.',
+        }
+    },
+    uploadValidation: {
+        title: "Xác thực Bài viết",
+        subtitle: "Đang kiểm tra \"{{name}}\" trước khi tải lên...",
+        frontmatter: {
+            section: "Kiểm tra Frontmatter",
+            label: "Cấu trúc Frontmatter",
+            notFound: "Không tìm thấy frontmatter trong file.",
+            valid: "Khớp với mẫu đang hoạt động.",
+            validBasic: "Cú pháp frontmatter hợp lệ.",
+            missingFields: "Thiếu các trường bắt buộc theo mẫu: {{fields}}",
+            parseError: "Không thể phân tích cú pháp frontmatter.",
+        },
+        images: {
+            section: "Kiểm tra Link Hình ảnh",
+            scanning: "Đang quét liên kết...",
+            noImages: "Không tìm thấy liên kết ảnh nào trong bài này.",
+            externalWarning: "Link ngoài. Không thể kiểm tra tính khả dụng (có thể do CORS).",
+            externalError: "Link ngoài có vẻ bị lỗi hoặc không truy cập được.",
+            externalValid: "Link ảnh ngoài hợp lệ và truy cập được.",
+            foundRepo: "File tồn tại trong kho chứa.",
+            notFoundRepo: "KHÔNG tìm thấy file trong kho chứa. Sẽ gây lỗi 404.",
+        },
+        summary: {
+            success: "Tất cả kiểm tra đều ổn!",
+            warning: "Có cảnh báo. Hãy xem lại trước khi tải lên.",
+            error: "Có lỗi nghiêm trọng. Hãy sửa trước khi tải lên.",
+        },
+        cancel: "Hủy",
+        confirm: "Xác nhận Tải lên",
+        confirmWarning: "Vẫn Tải lên",
+        error: {
+            fileRead: "Không thể đọc nội dung file.",
+        }
     },
     imageList: {
         loading: 'Đang tải hình ảnh...',
@@ -618,6 +886,9 @@ export const translations = {
         delete: 'Xóa',
         copyUrlButton: 'Sao chép URL',
         urlCopied: 'Đã sao chép!',
+        downloadButton: 'Tải xuống',
+        upload: "Tải ảnh lên",
+        uploading: "Đang tải...",
         infoBanner: {
           title: 'Đang xem dưới dạng Thư viện File',
           description: 'Ảnh xem trước được tải trực tiếp từ kho chứa của bạn, và giờ đã hỗ trợ cả kho chứa riêng tư. Để xem trước ảnh như trên một trang web thực tế, hãy đổi "Loại Dự án" thành Dự án Web trong Cài đặt và cung cấp URL tên miền.',
@@ -631,6 +902,15 @@ export const translations = {
             pageInfo: 'Trang {{current}} trên {{total}}',
             next: 'Sau',
         },
+    },
+    imageUploadModal: {
+        title: 'Tải lên Hình ảnh',
+        noFiles: 'Chưa chọn file nào.',
+        exists: 'File đã tồn tại.',
+        overwriteOption: 'Ghi đè?',
+        ready: 'Sẵn sàng tải lên.',
+        cancel: 'Hủy',
+        upload: 'Tải lên {{count}} File',
     },
     postPreview: {
         tabMetadata: 'Siêu dữ liệu',
@@ -697,11 +977,20 @@ export const translations = {
         info: 'Nếu không có mẫu nào được đặt, tính năng "Tạo Bài viết" sẽ sử dụng các quy tắc xác thực mặc định, ít nghiêm ngặt hơn. Việc đặt một mẫu được khuyến khích cao để đảm bảo tính nhất quán.',
         uploadTitle: 'Tải lên một file bài viết để tạo mẫu tùy chỉnh',
         uploadDesc: '.md hoặc .mdx',
+        or: 'HOẶC',
+        scanRepoTitle: 'Chọn từ Kho chứa',
+        scanRepoDesc: 'Quét thư mục bài viết của bạn để tìm file.',
+        scanButton: 'Quét Thư mục',
+        selectPlaceholder: 'Chọn một bài viết...',
+        loading: 'Đang quét...',
         processing: 'Đang xử lý...',
         error: {
             noFrontmatter: 'Không tìm thấy frontmatter trong file đã tải lên.',
             parse: 'Không thể phân tích cú pháp file.',
-            read: 'Không thể đọc file.'
+            read: 'Không thể đọc file.',
+            noPostsInRepo: 'Không tìm thấy file markdown nào trong thư mục bài viết.',
+            fetchPosts: 'Không thể quét thư mục bài viết.',
+            noPostsPath: 'Chưa cấu hình đường dẫn thư mục bài viết.',
         },
         previewTitle: 'Xem trước Mẫu đã tạo',
         saveButton: 'Lưu làm Mẫu hoạt động',
@@ -716,25 +1005,50 @@ export const translations = {
         table: {
             field: 'Tên trường',
             type: 'Loại dự kiến',
+        },
+        columns: {
+            title: 'Cột Bảng Mặc định',
+            description: 'Chọn tối đa 5 trường bạn muốn hiển thị mặc định trong chế độ xem bảng của trang "Quản lý Bài viết".',
+            maxReached: 'Đã đạt tối đa {{max}} cột. Hãy bỏ chọn một cột để thêm cột khác.',
         }
     },
     backupManager: {
+        title: 'Sao lưu & Xuất',
+        description: 'Tạo và tải xuống các tệp lưu trữ .zip của nội dung của bạn.',
+        create: {
+          title: "Tạo Bản sao lưu",
+          description: "Tạo một tệp lưu trữ .zip của thư mục nội dung hoặc hình ảnh của bạn. Sau đó bạn có thể tải về máy tính.",
+          successTitle: "Bản sao lưu đã sẵn sàng!",
+          downloadButton: "Tải xuống .zip",
+          newBackupButton: "Tạo bản sao lưu mới"
+        },
+        config: {
+            title: 'Sao lưu Cấu hình',
+            description: 'Tải xuống file cấu hình .acmrc.json của dự án này.',
+            button: 'Tải xuống Config',
+            notFound: 'Không tìm thấy file cấu hình (.acmrc.json) trong kho chứa.'
+        },
         posts: {
             title: 'Sao lưu Bài viết',
             description: 'Tạo một file nén .zip chứa tất cả các file markdown từ thư mục nội dung của bạn: {{path}}',
             button: 'Sao lưu Tất cả Bài viết',
             zipping: 'Đang nén bài viết...',
+            filesFound: "Tìm thấy {{count}} file bài viết",
+            createButton: "Tạo Bản sao lưu Bài viết"
         },
         images: {
             title: 'Sao lưu Hình ảnh',
             description: 'Tạo một file nén .zip chứa tất cả các file từ thư mục tài sản của bạn: {{path}}',
             button: 'Sao lưu Tất cả Hình ảnh',
             zipping: 'Đang nén hình ảnh...',
+            filesFound: "Tìm thấy {{count}} file hình ảnh",
+            createButton: "Tạo Bản sao lưu Hình ảnh"
         },
-        error: 'Sao lưu thất bại.',
-        errorDetail: 'Lỗi: {{message}}',
-        success: 'Đã tải xuống {{count}} file.',
-        noFiles: 'Không tìm thấy file nào để sao lưu.',
+        error: {
+          general: 'Sao lưu thất bại.',
+          detail: 'Lỗi: {{message}}',
+          noFiles: "Không tìm thấy file nào trong thư mục này để sao lưu.",
+        },
         zipError: 'Thư viện JSZip chưa được tải.',
     },
     fileUploader: {
@@ -744,119 +1058,12 @@ export const translations = {
         success: 'Đã tải lên thành công {{name}}!',
         error: 'Đã xảy ra lỗi không xác định trong quá trình tải lên.',
     },
-    guide: {
-      title: "Hướng dẫn sử dụng Astro Content Manager",
-      welcome: {
-        title: "Chào mừng bạn!",
-        p1: "Chào bạn, tôi là nhà phát triển Astro của bạn đây. Rất vui được giải thích tổng quan về cấu trúc và cách hoạt động của ứng dụng Astro Content Manager. Đây là một ứng dụng rất thú vị và được thiết kế tốt!"
-      },
-      overview: {
-        title: "Tổng Quan Ứng Dụng",
-        purposeLabel: "Mục đích chính:",
-        purposeText: "\"Astro Content Manager\" là một giao diện web (Web UI) hoạt động hoàn toàn phía trình duyệt (client-side). Nó cho phép bạn quản lý nội dung (bài viết Markdown/MDX và hình ảnh) trực tiếp trên kho chứa (repository) GitHub của mình, đặc biệt hữu ích cho các dự án xây dựng bằng Astro.js. Mục tiêu là đơn giản hóa quy trình làm việc, giúp bạn đăng bài, cập nhật nội dung mà không cần dùng đến các lệnh Git phức tạp hay môi trường lập trình local.",
-        techLabel: "Công nghệ sử dụng:",
-        tech: {
-          framework: "Frontend Framework: React và TypeScript.",
-          styling: "Styling: Tailwind CSS để xây dựng giao diện nhanh chóng và nhất quán.",
-          api: "Tương tác API: Sử dụng trực tiếp",
-          apiText: "API của trình duyệt để gọi đến GitHub REST API.",
-          libs: "Thư viện ngoài (tải qua CDN):",
-          libsMarked: "Để render nội dung Markdown thành HTML một cách an toàn.",
-          libsJsZip: "Để tạo file nén",
-          libsJsZip2: "cho chức năng sao lưu (backup).",
-          special: "Điểm đặc biệt:",
-          specialText: "Ứng dụng này không cần bước build (build step). Nó sử dụng",
-          specialText2: "trong",
-          specialText3: "để tải các module React trực tiếp, giúp bạn có thể chạy nó ngay lập tức chỉ bằng cách mở file",
-          specialText4: "trên trình duyệt."
-        }
-      },
-      workflow: {
-        title: "Luồng Hoạt Động (Workflow)",
-        intro: "Đây là cách ứng dụng hoạt động từ đầu đến cuối:",
-        step1: {
-          title: "Đăng nhập & Kết nối:",
-          li1: "Người dùng truy cập ứng dụng và thấy màn hình kết nối GitHub.",
-          li2: {
-            t1: "Họ nhập vào",
-            strong1: "Repository URL",
-            t2: "và một",
-            strong2: "Fine-Grained Personal Access Token (PAT)",
-            t3: "của GitHub. Token này cần có quyền",
-            code1: "Read and write",
-            t4: "vào mục",
-            code2: "Contents",
-            t5: "của kho chứa."
-          }
-        },
-        step2: {
-          title: "Xác thực & Mã hóa:",
-          li1: "Ứng dụng xác thực token và kiểm tra quyền truy cập vào repo.",
-          li2: {
-            t1: "Nếu thành công, ứng dụng sẽ mã hóa token bằng",
-            t2: "và lưu vào",
-            t3: "của trình duyệt. Việc này an toàn hơn nhiều so với việc lưu token dưới dạng văn bản thuần."
-          },
-          li3: "Sau khi lưu, ứng dụng sẽ hiển thị giao diện chính là Dashboard."
-        },
-        step3: {
-          title: "Thiết lập lần đầu:",
-          li1: {
-            t1: "Khi vào Dashboard lần đầu cho một repo, ứng dụng sẽ tự động quét kho chứa để tìm các thư mục có chứa file Markdown (ví dụ:",
-          },
-          li2: {
-            t1: "Nó sẽ gợi ý các thư mục này cho bạn chọn làm thư mục bài viết. Lựa chọn của bạn sẽ được lưu vào",
-            t2: "để các lần truy cập sau không cần chọn lại."
-          }
-        },
-        step4: {
-          title: "Quản lý Nội dung:",
-          li1: "Người dùng tương tác với các tab trên Dashboard. Mọi hành động (đọc, tạo, sửa, xóa file) đều được chuyển thành các lệnh gọi API tương ứng đến GitHub.",
-          li2: "Mỗi hành động sẽ tạo ra một commit mới trên repo."
-        },
-        step5: {
-          title: "Kết thúc phiên:",
-          li1: {
-            t1: "Khi người dùng bấm \"Log Out\" hoặc đóng tab trình duyệt,",
-            t2: "sẽ tự động bị xóa, đồng nghĩa với việc token và khóa mã hóa cũng bị xóa, đảm bảo an toàn."
-          }
-        }
-      },
-      structure: {
-        title: "Cấu Trúc Code và Vai Trò Các File Chính",
-        index: "File HTML gốc, là điểm khởi đầu.",
-        app: "Component gốc của toàn bộ ứng dụng, quản lý trạng thái đăng nhập.",
-        service: "\"Trái tim\" của việc tương tác với GitHub API.",
-        utils: "Thư mục chứa các hàm tiện ích như mã hóa và phân tích Markdown.",
-        components: "Thư mục chứa tất cả các component React:",
-        componentsDashboard: "Giao diện chính sau khi đăng nhập.",
-        componentsPostList: "Hiển thị danh sách các bài viết.",
-        componentsNewPost: "Giao diện tạo bài viết mới.",
-        componentsTemplate: "Tạo mẫu frontmatter để xác thực.",
-        componentsBackup: "Cung cấp chức năng sao lưu.",
-        componentsPicker: "Cửa sổ chọn thư mục."
-      },
-      i18n: {
-        title: 'Hệ thống Đa ngôn ngữ (i18n)',
-        p1: 'Ứng dụng hỗ trợ đầy đủ tiếng Anh và tiếng Việt. Logic được quản lý trong thư mục',
-        p1_code1: 'i18n/',
-        p1_cont: '. Khi bạn cần thêm văn bản mới, hãy thêm một khóa và giá trị tương ứng cho cả hai ngôn ngữ trong file',
-        p1_code2: 'translations.ts',
-        p1_cont2: ', sau đó gọi hàm',
-        p1_code3: "t('your.key')",
-        p1_cont3: 'từ hook',
-        p1_code4: 'useI18n()',
-        p1_cont4: 'trong component của bạn. Ngôn ngữ được chọn sẽ được lưu vào',
-        p1_code5: 'localStorage',
-        p1_cont5: 'để duy trì qua các phiên làm việc.'
-      },
-      updating: {
-        title: "Cập nhật Ứng dụng",
-        p1: "Vì đây là một ứng dụng hoạt động hoàn toàn phía trình duyệt (client-side), việc cập nhật lên phiên bản mới nhất rất đơn giản.",
-        p2: "Nếu bạn đã sao chép (clone) dự án từ GitHub, bạn chỉ cần đi đến thư mục dự án trên máy tính và chạy lệnh sau để lấy về các cập nhật mới nhất:",
-        code: "git pull origin main",
-        p3: "Sau đó, chỉ cần tải lại file `index.html` trong trình duyệt là bạn đã sử dụng phiên bản mới nhất!"
-      }
-    }
+    language: {
+      en: 'English',
+      vi: 'Tiếng Việt',
+    },
+    languageSwitcher: {
+        modalTitle: 'Chọn Ngôn ngữ',
+    },
   }
 };

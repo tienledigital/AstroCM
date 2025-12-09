@@ -1,7 +1,5 @@
 import React from 'react';
 
-// FIX: Updated component to accept a `title` prop for accessibility and to fix the type error.
-// The `title` prop is used to render a `<title>` element inside the SVG, which provides a tooltip.
 export const StarIcon: React.FC<React.SVGProps<SVGSVGElement> & { title?: string }> = ({ title, ...props }) => (
   <svg 
     xmlns="http://www.w3.org/2000/svg" 

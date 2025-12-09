@@ -1,214 +1,238 @@
+
 import React, { useState, useEffect } from 'react';
-import { GithubRepo, GithubContent } from '../types';
-import * as githubService from '../services/githubService';
+import { GithubRepo, GithubContent, IGitService } from '../types';
 import { SpinnerIcon } from './icons/SpinnerIcon';
 import { DownloadIcon } from './icons/DownloadIcon';
 import { DocumentIcon } from './icons/DocumentIcon';
 import { ImageIcon } from './icons/ImageIcon';
-import { CheckCircleIcon } from './icons/CheckCircleIcon';
-import { ExclamationTriangleIcon } from './icons/ExclamationTriangleIcon';
 import { useI18n } from '../i18n/I18nContext';
+import { ExclamationTriangleIcon } from './icons/ExclamationTriangleIcon';
+import { SettingsIcon } from './icons/SettingsIcon';
 
 // Declare JSZip from CDN
 declare var JSZip: any;
 
 interface BackupManagerProps {
-    token: string;
+    gitService: IGitService;
     repo: GithubRepo;
     postsPath: string;
     imagesPath: string;
 }
 
-// A reusable card component for backup options
-const BackupCard: React.FC<{
-    title: string;
-    description: string;
-    icon: React.ReactNode;
-    buttonText: string;
-    buttonIcon: React.ReactNode;
-    loadingText: string;
-    isLoading: boolean;
-    error: string | null;
-    success: string | null;
-    onBackup: () => void;
-    buttonColorClass: string;
-}> = ({
-    title,
-    description,
-    icon,
-    buttonText,
-    buttonIcon,
-    loadingText,
-    isLoading,
-    error,
-    success,
-    onBackup,
-    buttonColorClass,
-}) => {
-    return (
-        <div className="bg-white p-6 rounded-lg shadow-md border border-gray-200 flex flex-col items-center text-center transition-all duration-300 hover:shadow-lg">
-            {icon}
-            <h3 className="text-xl font-bold text-gray-800 mt-4">{title}</h3>
-            <p className="text-gray-600 text-sm mt-2 mb-6 flex-grow">{description}</p>
-            
-            <div className="w-full h-16 flex items-center justify-center">
-                {isLoading ? (
-                    <div className="flex flex-col items-center text-sm text-gray-500">
-                        <SpinnerIcon className="animate-spin h-6 w-6 text-gray-400" />
-                        <span className="mt-2">{loadingText}</span>
-                    </div>
-                ) : error ? (
-                    <div className="flex items-center text-red-600 bg-red-50 p-3 rounded-md w-full">
-                        <ExclamationTriangleIcon className="w-5 h-5 mr-2 flex-shrink-0" />
-                        <span className="text-sm font-medium">{error}</span>
-                    </div>
-                ) : success ? (
-                    <div className="flex items-center text-green-600 bg-green-50 p-3 rounded-md w-full">
-                        <CheckCircleIcon className="w-5 h-5 mr-2 flex-shrink-0" />
-                        <span className="text-sm font-medium">{success}</span>
-                    </div>
-                ) : (
-                    <button
-                        onClick={onBackup}
-                        disabled={isLoading}
-                        className={`w-full flex justify-center items-center text-white font-bold py-2.5 px-4 rounded-md transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${buttonColorClass}`}
-                    >
-                        {buttonIcon}
-                        {buttonText}
-                    </button>
-                )}
-            </div>
-        </div>
-    );
+interface ZipData {
+    blob: Blob;
+    name: string;
+    size: string;
+}
+
+const formatBytes = (bytes: number, decimals = 2) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const dm = decimals < 0 ? 0 : decimals;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 };
 
-
-const BackupManager: React.FC<BackupManagerProps> = ({ token, repo, postsPath, imagesPath }) => {
-    const [isBackingUpPosts, setIsBackingUpPosts] = useState(false);
-    const [postsError, setPostsError] = useState<string | null>(null);
-    const [postsSuccess, setPostsSuccess] = useState<string | null>(null);
-
-    const [isBackingUpImages, setIsBackingUpImages] = useState(false);
-    const [imagesError, setImagesError] = useState<string | null>(null);
-    const [imagesSuccess, setImagesSuccess] = useState<string | null>(null);
+const BackupManager: React.FC<BackupManagerProps> = ({ gitService, repo, postsPath, imagesPath }) => {
     const { t } = useI18n();
     
-    // Effect to clear messages after a delay
-    useEffect(() => {
-        if (postsSuccess || postsError) {
-            const timer = setTimeout(() => {
-                setPostsSuccess(null);
-                setPostsError(null);
-            }, 5000);
-            return () => clearTimeout(timer);
-        }
-    }, [postsSuccess, postsError]);
+    // File fetching state
+    const [postFiles, setPostFiles] = useState<GithubContent[]>([]);
+    const [imageFiles, setImageFiles] = useState<GithubContent[]>([]);
+    const [isFetchingCounts, setIsFetchingCounts] = useState(true);
+
+    // Zipping state
+    const [isZippingPosts, setIsZippingPosts] = useState(false);
+    const [postsZip, setPostsZip] = useState<ZipData | null>(null);
+    const [postsError, setPostsError] = useState<string | null>(null);
+    const [isZippingImages, setIsZippingImages] = useState(false);
+    const [imagesZip, setImagesZip] = useState<ZipData | null>(null);
+    const [imagesError, setImagesError] = useState<string | null>(null);
 
     useEffect(() => {
-        if (imagesSuccess || imagesError) {
-            const timer = setTimeout(() => {
-                setImagesSuccess(null);
-                setImagesError(null);
-            }, 5000);
-            return () => clearTimeout(timer);
-        }
-    }, [imagesSuccess, imagesError]);
+        const fetchFileCounts = async () => {
+            setIsFetchingCounts(true);
+            try {
+                const [postContents, imageContents] = await Promise.all([
+                    gitService.getRepoContents(postsPath).catch(() => []),
+                    gitService.getRepoContents(imagesPath).catch(() => [])
+                ]);
+                setPostFiles(postContents.filter(item => item.type === 'file' && (item.name.endsWith('.md') || item.name.endsWith('.mdx'))));
+                setImageFiles(imageContents.filter(item => item.type === 'file'));
+            } catch (error) {
+                console.error("Failed to fetch file lists", error);
+            } finally {
+                setIsFetchingCounts(false);
+            }
+        };
+        fetchFileCounts();
+    }, [gitService, postsPath, imagesPath]);
 
-    const handleBackup = async (
-        path: string, 
-        fileFilter: (item: GithubContent) => boolean,
-        setIsLoading: (loading: boolean) => void,
+    const createZip = async (
+        filesToBackup: GithubContent[],
+        backupType: 'posts' | 'images',
+        setIsZipping: (loading: boolean) => void,
         setError: (error: string | null) => void,
-        setSuccess: (message: string | null) => void,
-        backupType: 'posts' | 'images'
+        setZipData: (data: ZipData | null) => void
     ) => {
-        setIsLoading(true);
+        setIsZipping(true);
         setError(null);
-        setSuccess(null);
+        setZipData(null);
+
+        if (filesToBackup.length === 0) {
+            setError(t('backupManager.error.noFiles'));
+            setIsZipping(false);
+            return;
+        }
 
         try {
             if (typeof JSZip === 'undefined') throw new Error(t('backupManager.zipError'));
 
             const zip = new JSZip();
-            const contents = await githubService.getRepoContents(token, repo.owner.login, repo.name, path);
-            const filesToBackup = contents.filter(item => item.type === 'file' && fileFilter(item));
-
-            if (filesToBackup.length === 0) {
-                 setSuccess(t('backupManager.noFiles'));
-                 setIsLoading(false);
-                 return;
-            }
-
-            const fetchPromises = filesToBackup.map(async (file) => {
-                const blob = await githubService.getFileAsBlob(token, repo.owner.login, repo.name, file.path);
+            await Promise.all(filesToBackup.map(async (file) => {
+                const blob = await gitService.getFileAsBlob(file.path);
                 zip.file(file.name, blob);
-            });
+            }));
             
-            await Promise.all(fetchPromises);
-
             const zipBlob = await zip.generateAsync({ type: 'blob' });
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(zipBlob);
             const date = new Date().toISOString().split('T')[0];
-            link.download = `${repo.name}-${backupType}-backup-${date}.zip`;
+            const zipName = `${repo.name}-${backupType}-backup-${date}.zip`;
+            
+            setZipData({ blob: zipBlob, name: zipName, size: formatBytes(zipBlob.size) });
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Unknown error');
+        } finally {
+            setIsZipping(false);
+        }
+    };
+    
+    const handleDownload = (zipData: ZipData) => {
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(zipData.blob);
+        link.download = zipData.name;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(link.href);
+    };
+
+    const handleDownloadConfig = async () => {
+        try {
+            const content = await gitService.getFileContent('.acmrc.json');
+            const blob = new Blob([content], { type: 'application/json' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = '.acmrc.json';
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
             URL.revokeObjectURL(link.href);
-
-            setSuccess(t('backupManager.success', { count: filesToBackup.length }));
-
-        } catch (err) {
-            const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-            setError(errorMessage.length > 30 ? t('backupManager.error') : t('backupManager.errorDetail', { message: errorMessage }));
-        } finally {
-            setIsLoading(false);
+        } catch (e) {
+            alert(t('backupManager.config.notFound'));
         }
     };
+    
+    const BackupRow: React.FC<{
+        title: string;
+        description: string;
+        icon: React.ReactNode;
+        buttonLabel: string;
+        isProcessing: boolean;
+        zipData: ZipData | null;
+        error: string | null;
+        onAction: () => void;
+        onDownload: () => void;
+        onReset: () => void;
+    }> = ({ title, description, icon, buttonLabel, isProcessing, zipData, error, onAction, onDownload, onReset }) => {
+        return (
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-white border-b border-notion-border last:border-b-0 hover:bg-notion-hover/30 transition-colors gap-4">
+                <div className="flex items-start">
+                    <div className="mr-3 mt-0.5 text-notion-muted">{icon}</div>
+                    <div>
+                        <h4 className="text-sm font-medium text-notion-text">{title}</h4>
+                        <p className="text-xs text-notion-muted mt-0.5 max-w-md">{description}</p>
+                        {error && <p className="text-xs text-red-600 mt-1 flex items-center"><ExclamationTriangleIcon className="w-3 h-3 mr-1"/>{error}</p>}
+                    </div>
+                </div>
+                <div className="flex-shrink-0">
+                    {zipData ? (
+                        <div className="flex items-center gap-2">
+                            <div className="text-right mr-2 hidden sm:block">
+                                <p className="text-xs font-medium text-green-600">Ready</p>
+                                <p className="text-[10px] text-notion-muted">{zipData.size}</p>
+                            </div>
+                            <button 
+                                onClick={onDownload} 
+                                className="inline-flex items-center px-3 py-1.5 bg-white border border-notion-border rounded-sm text-sm font-medium text-notion-text hover:bg-notion-hover shadow-sm"
+                            >
+                                <DownloadIcon className="w-3.5 h-3.5 mr-1.5" />
+                                {t('backupManager.create.downloadButton')}
+                            </button>
+                            <button onClick={onReset} className="text-xs text-notion-muted underline ml-2 hover:text-notion-text">Reset</button>
+                        </div>
+                    ) : (
+                        <button
+                            onClick={onAction}
+                            disabled={isProcessing || isFetchingCounts}
+                            className="inline-flex items-center px-3 py-1.5 bg-white border border-notion-border rounded-sm text-sm font-medium text-notion-text hover:bg-notion-hover shadow-sm disabled:opacity-50 min-w-[120px] justify-center"
+                        >
+                            {isProcessing ? <SpinnerIcon className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : null}
+                            {isProcessing ? 'Processing...' : buttonLabel}
+                        </button>
+                    )}
+                </div>
+            </div>
+        );
+    }
 
     return (
-        <div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <BackupCard
+        <div className="max-w-4xl mx-auto">
+            {/* Header */}
+            <div className="mb-6 p-4 bg-notion-sidebar border border-notion-border rounded-md">
+                <h3 className="text-sm font-bold text-notion-text uppercase tracking-wide mb-1">{t('backupManager.create.title')}</h3>
+                <p className="text-xs text-notion-muted">{t('backupManager.create.description')}</p>
+            </div>
+
+            {/* List */}
+            <div className="border border-notion-border rounded-md overflow-hidden bg-white shadow-sm">
+                <BackupRow 
                     title={t('backupManager.posts.title')}
-                    description={t('backupManager.posts.description', { path: postsPath })}
-                    icon={<DocumentIcon className="w-20 h-20 text-blue-500" />}
-                    buttonText={t('backupManager.posts.button')}
-                    buttonIcon={<DownloadIcon className="w-5 h-5 mr-2" />}
-                    loadingText={t('backupManager.posts.zipping')}
-                    isLoading={isBackingUpPosts}
+                    description={t('backupManager.posts.filesFound', { count: postFiles.length })}
+                    icon={<DocumentIcon className="w-5 h-5" />}
+                    buttonLabel="Create Archive"
+                    isProcessing={isZippingPosts}
+                    zipData={postsZip}
                     error={postsError}
-                    success={postsSuccess}
-                    onBackup={() => handleBackup(
-                        postsPath, 
-                        (item) => item.name.endsWith('.md') || item.name.endsWith('.mdx'),
-                        setIsBackingUpPosts, 
-                        setPostsError, 
-                        setPostsSuccess, 
-                        'posts'
-                    )}
-                    buttonColorClass="bg-blue-600 hover:bg-blue-700"
+                    onAction={() => createZip(postFiles, 'posts', setIsZippingPosts, setPostsError, setPostsZip)}
+                    onDownload={() => postsZip && handleDownload(postsZip)}
+                    onReset={() => setPostsZip(null)}
                 />
                 
-                <BackupCard
+                <BackupRow 
                     title={t('backupManager.images.title')}
-                    description={t('backupManager.images.description', { path: imagesPath })}
-                    icon={<ImageIcon className="w-20 h-20 text-purple-500" />}
-                    buttonText={t('backupManager.images.button')}
-                    buttonIcon={<DownloadIcon className="w-5 h-5 mr-2" />}
-                    loadingText={t('backupManager.images.zipping')}
-                    isLoading={isBackingUpImages}
+                    description={t('backupManager.images.filesFound', { count: imageFiles.length })}
+                    icon={<ImageIcon className="w-5 h-5" />}
+                    buttonLabel="Create Archive"
+                    isProcessing={isZippingImages}
+                    zipData={imagesZip}
                     error={imagesError}
-                    success={imagesSuccess}
-                    onBackup={() => handleBackup(
-                        imagesPath, 
-                        () => true, // Backup all files in the directory
-                        setIsBackingUpImages, 
-                        setImagesError, 
-                        setImagesSuccess, 
-                        'images'
-                    )}
-                    buttonColorClass="bg-purple-600 hover:bg-purple-700"
+                    onAction={() => createZip(imageFiles, 'images', setIsZippingImages, setImagesError, setImagesZip)}
+                    onDownload={() => imagesZip && handleDownload(imagesZip)}
+                    onReset={() => setImagesZip(null)}
+                />
+
+                <BackupRow 
+                    title={t('backupManager.config.title')}
+                    description={t('backupManager.config.description')}
+                    icon={<SettingsIcon className="w-5 h-5" />}
+                    buttonLabel="Export JSON"
+                    isProcessing={false}
+                    zipData={null}
+                    error={null}
+                    onAction={handleDownloadConfig}
+                    onDownload={() => {}}
+                    onReset={() => {}}
                 />
             </div>
         </div>

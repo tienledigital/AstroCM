@@ -1,9 +1,11 @@
 
 
 
+
+
+
 import React, { useState, useEffect, useCallback } from 'react';
-import { GithubRepo } from '../types';
-import * as githubService from '../services/githubService';
+import { GithubRepo, IGitService } from '../types';
 import { slugify, parseMarkdown, updateFrontmatter, escapeRegExp } from '../utils/parsing';
 import { compressImage } from '../utils/image';
 import { UploadIcon } from './icons/UploadIcon';
@@ -15,7 +17,7 @@ import { InfoIcon } from './icons/InfoIcon';
 import { useI18n } from '../i18n/I18nContext';
 
 interface NewPostCreatorProps {
-  token: string;
+  gitService: IGitService;
   repo: GithubRepo;
   postsPath: string;
   imagesPath: string;
@@ -63,7 +65,7 @@ const TimelineItem: React.FC<{
 };
 
 const NewPostCreator: React.FC<NewPostCreatorProps> = ({
-  token, repo, postsPath, imagesPath, newPostCommitTemplate, newImageCommitTemplate, imageFileTypes, publishDateSource, imageCompressionEnabled, maxImageSize, imageResizeMaxWidth
+  gitService, repo, postsPath, imagesPath, newPostCommitTemplate, newImageCommitTemplate, imageFileTypes, publishDateSource, imageCompressionEnabled, maxImageSize, imageResizeMaxWidth
 }) => {
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
@@ -279,7 +281,7 @@ const NewPostCreator: React.FC<NewPostCreatorProps> = ({
         await Promise.all(imageFiles.map(file => {
             const commitMessage = newImageCommitTemplate.replace('{filename}', file.name);
             const fullPath = imagesPath ? `${imagesPath}/${file.name}` : file.name;
-            return githubService.uploadFile(token, repo.owner.login, repo.name, fullPath, file, commitMessage);
+            return gitService.uploadFile(fullPath, file, commitMessage);
         }));
 
         // Now, prepare the markdown file, updating any changed image names
@@ -290,13 +292,14 @@ const NewPostCreator: React.FC<NewPostCreatorProps> = ({
         }
 
         const { frontmatter } = parseMarkdown(finalMarkdownContent);
-        const slug = slugify(frontmatter.title);
+        // Ensure slugify receives a string, even if title is undefined or unknown type
+        const slug = slugify(String(frontmatter.title || ''));
         const fileExtension = markdownFile.name.split('.').pop() || 'md';
         const filename = `${slug}.${fileExtension}`;
         const postPath = postsPath ? `${postsPath}/${filename}` : filename;
         
         const commitMessage = newPostCommitTemplate.replace('{filename}', filename);
-        await githubService.createFileFromString(token, repo.owner.login, repo.name, postPath, finalMarkdownContent, commitMessage);
+        await gitService.createFileFromString(postPath, finalMarkdownContent, commitMessage);
 
         setSuccess(t('newPost.publishSuccess', { filename }));
         setTimeout(resetState, 3000);

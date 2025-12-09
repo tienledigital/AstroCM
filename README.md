@@ -1,11 +1,19 @@
+<<<<<<< HEAD
 
 # Astro Content Manager
+=======
+# Astro CM
+>>>>>>> eefd7b66f818c9ee5b96cd775e871464e45b1a36
 > **Version:** 1.4.0 (Stable)
 
 A simple, clean web interface to upload Markdown/MDX posts and images directly to your project's repository on **GitHub**. Streamline your content workflow without leaving the browser.
 
 <p align="center">
+<<<<<<< HEAD
   <img src="https://raw.githubusercontent.com/tienledigital/AstroCM/main/.github/assets/screenshot-1.png" width="100%" alt="Astro Content Manager Preview">
+=======
+  <img src=".github/assets/screenshot-1.png" width="100%" alt="Astro Content Manager Preview">
+>>>>>>> eefd7b66f818c9ee5b96cd775e871464e45b1a36
 </p>
 
 **Quick Links:** [Project Overview](./OVERVIEW.md) • [Changelog](./CHANGELOG.md) • [Licenses](./LICENSES.md)
